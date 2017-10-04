@@ -1,0 +1,12 @@
+import sys
+from configparser import ConfigParser
+
+
+def main():
+    parser = ConfigParser()
+    config_file = 'config/basic_configuration.properties'
+    if len(sys.argv) == 2:
+        config_file = sys.argv[1]
+        print('Config file : ' + config_file)
+    parser.read(config_file)
+    print(parser.get('olympus', 'timeout_in_sec'))
