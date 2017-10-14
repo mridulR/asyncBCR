@@ -1,12 +1,55 @@
 import sys
-from configparser import ConfigParser
+import subprocess
+import time
+from src.replicas.replica import replica
 
+class olympus(process):
+    def setup(config_file):
+        self.config_file = config_file
+    def run():
+        print("In Olympus Run ")
+        #rep1 = new(replica, args = ("ReplicaNode1", "ReplicaNode1", \
+        #            "ReplicaNode2", "ReplicaNode3", ), at = "ReplicaNode1")
+        #
+        #rep2 = new(replica, args = ("ReplicaNode1", "ReplicaNode2", \
+        #            "ReplicaNode3", "ReplicaNode3", ), at = "ReplicaNode2")
+        #
+        #rep3 = new(replica, args = ("ReplicaNode1", "ReplicaNode3", \
+        #            "None", "ReplicaNode3", ), at = "ReplicaNode3")
 
-def main():
-    parser = ConfigParser()
-    config_file = 'config/basic_configuration.properties'
-    if len(sys.argv) == 2:
-        config_file = sys.argv[1]
-        print('Config file : ' + config_file)
-    parser.read(config_file)
-    print(parser.get('olympus', 'timeout_in_sec'))
+        #start(rep1)
+        #start(rep2)
+        #start(rep3)
+
+        '''for ind in range(1, 4):
+            print(str(ind) + "************************")
+            node_name = 'ReplicaNode' + str(ind)
+            
+            #cmd = 'python3 -m da -n '+ node_name + ' -D -f --logfilename logs/' + node_name \
+            #    + '.log' + ' -L info ' + ' src/replicas/replica.da ' + config_file + ' ' + node_name
+            #subprocess.Popen(cmd, shell= True)
+            #print("subprocess ran for ", node_name)
+            #time.sleep(1)
+            output("started node " + node_name)
+
+            if ind == 1:
+                rep = new(replica, args = ("ReplicaNode1", "ReplicaNode1", \
+                    "ReplicaNode2", "ReplicaNode3", ), at = "ReplicaNode1")
+                start(rep)
+            elif ind == 2:
+                rep = new(replica, args = ("ReplicaNode1", "ReplicaNode2", \
+                    "ReplicaNode3", "ReplicaNode3", ), at = "ReplicaNode2")
+                start(rep)
+            else:
+                rep = new(replica, args = ("ReplicaNode1", "ReplicaNode3", \
+                    "None", "ReplicaNode3", ), at = "ReplicaNode3")
+                start(rep)'''           
+            #print("In olympus run ")
+
+#def main():
+#    print("In olympus main")
+#    oly = new(olympus, args=(sys.argv[1],))
+#    start(oly)
+#    '''while True:
+#        print("In olympus main")
+#        time.sleep(5)'''

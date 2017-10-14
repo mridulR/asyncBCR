@@ -1,0 +1,60 @@
+import sys
+import time
+
+class replica(process):    
+
+    STATE = "SOME_STATE"    
+
+    def setup(replicas, prev, me, next_r):
+        self.REPLICAS = replicas    
+        print(self.REPLICAS)
+        self.prev = prev
+        self.me = me
+        self.next_r = next_r
+
+    def receive(msg=('test', ), from_= self.prev):
+        output("Received data from " + str(self.prev))
+        if self.next_r == None:
+            print("Sending to client : ")
+            send(('reverse',), to = self.prev)
+        else:
+            send(('test',), to = self.next_r)
+
+    def receive(msg=('reverse', ), from_= self.next_r):
+        output("Received data from " + str(self.next_r))
+        if self.prev == None:
+            print("Shutttle back to head : ")
+        else:
+            send(('reverse',), to = self.prev)
+
+    def run():
+        #print('Its ' + self.me + ' next ' + self.next_r + ' head : ' + self.head + ' tail : ' + self.tail)
+        #await(received('',))
+        #print('Its ' + self.me + ' next ' + self.next_r + ' head : ' + self.head + ' tail : ' + self.tail)
+        print("Before Sending -- ", str(self.me), str(self.next_r))
+        if self.prev == None:
+            print("Sending -- ", str(self.me), str(self.next_r))
+            print(self.REPLICAS)
+            send(('test',), to = self.next_r)
+        await(received(('',)))
+
+#def main():
+#    print("I am - " + str(sys.argv[2]))
+#    me = sys.argv[2]
+#    my_index = int(me[-1:])
+#    if my_index == 1:
+#        rep = new(replica, args = (me, me, me[0:-1] + str(my_index + 1), me[0:-1] + str(my_index + 2), ))
+#        print("replica 1 started")
+#        start(rep)    
+#    elif my_index == 2:
+#        rep = new(replica, args = (me[0:-1] + str(my_index - 1), me, me[0:-1] + str(my_index + 1), me[0:-1] + str(my_index + 1), ))
+#        print("replica 2 started")
+#        start(rep)
+#    elif my_index == 3:
+#        rep = new(replica, args = (me[0:-1] + str(my_index - 2), me, 'None', me,))
+#        print("replica 3 started")
+#        start(rep)
+#    else:
+#        raise NameError(me)
+#    while(True):
+#        time.sleep(10)
