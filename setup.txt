@@ -1,6 +1,5 @@
-Follow following steps:
 
-1. Install virtual environment
-2. Activate virtual environment with python3
-3. Install pyDistAlgo
-4. Install pep8 
+  Run starting script:
+
+    python3 -m da  -n cofig_node configure_nodes/configure_nodes.da <path of config file>
+

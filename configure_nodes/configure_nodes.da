@@ -1,0 +1,82 @@
+from src.utils import config_parser
+import sys
+import subprocess
+import time
+import os
+
+replica = import_da("src.replicas.replica")
+olympus = import_da("src.olympus.olympus")
+client = import_da("src.client.client")
+
+"""
+This is the starting script for Byzantine chain replication.
+
+It is provided with a config file which is eventually shared
+by all processes eg olympus, replicas and clients.
+
+Responsibility:
+    1. Receive config file path from command-line input.
+    2. In case no config file is specified, keep the default config
+       file which is /config/config.csv in our case.
+    3. Initialize olympus and pass config file.
+    4. Initialize clients and pass config file.
+"""
+def main():
+
+    # Read configuration
+    config_file = 'config/config.csv'
+    if len(sys.argv) > 1:
+        config_file = sys.argv[1]
+    else:
+        print("No configuration file is passed. Picking default : /config/config.csv")
+
+    config = config_parser.get_config(config_file)
+    print("num of clients ", config[client.NUM_OF_CLIENTS])
+
+    # Start client.
+    # Number of clients, their hosts and timeout is read from config file
+    
+        
+    
+
+    # Start Olympus for now
+    node_name = 'OlympusNode'
+
+    oly = new(olympus.olympus, args=("dummy",), at="oly")
+    replicas = []
+    rep1 = new(replica.replica, num=1, at = "ReplicaNode1")
+    rep2 = new(replica.replica, num=1, at = "ReplicaNode2")
+    rep3 = new(replica.replica, num=1, at = "ReplicaNode3")
+
+    replicas.extend(rep1)
+    replicas.extend(rep2)
+    replicas.extend(rep3)
+
+    print(replicas)
+    for ind in range(len(replicas)):
+        if ind == 0: 
+            setup(replicas[0], [replicas, None, replicas[ind], replicas[1]])
+        elif ind == len(replicas) - 1:
+            setup(replicas[ind], [replicas, replicas[ind - 1], replicas[ind], None])
+        else:
+            setup(replicas[ind], [replicas, replicas[ind - 1], replicas[ind], replicas[ind + 1]])
+
+    start(oly)
+    start(rep1)
+    start(rep2)
+    start(rep3)
+
+    '''cmd = 'python3 -m da -n '+ node_name + ' -f --logfilename logs/' + node_name \
+        + '.log' + ' -L info ' + ' src/olympus/olympus.da ' + config_file
+    subprocess.Popen(cmd, shell= True)
+    time.sleep(1)'''
+
+    # Start Client for now
+    '''node_name = 'ClientNode'
+    cmd = 'python3 -m da -n '+ node_name + ' -f --logfilename logs/' + node_name \
+        + '.log' + ' -L info ' + ' src/client/client.da ' + config_file
+    subprocess.Popen(cmd, shell= True)
+    time.sleep(1)'''
+
+    print("Env set up has been done.Procced")
+

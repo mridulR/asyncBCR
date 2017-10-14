@@ -1,4 +1,15 @@
 import time
 
+# Configuration keys for client
+NUM_OF_CLIENTS = "num_client"
+    
+class client(process):
+    
+    def setup():
+        pass
+
+    def run():
+        pass
+    
 def main():
     print("I am Client!!! --- ")
