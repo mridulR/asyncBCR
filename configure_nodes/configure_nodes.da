@@ -1,5 +1,5 @@
 from src.utils import config_parser
-from src.utils import logger 
+from src.utils import Logger 
 import sys
 import subprocess
 import time
@@ -28,9 +28,9 @@ def main():
     # Read configuration
     config_file = 'config/config.csv'
     
-    logger.setLogFormatting("config_node.log", logger.getLogDir(), logging.WARN)                                                                        
-    logger.setLogNodeInfo("<config_node#1234>", "CONFIG_NODE");
-    logging.warn("Hello this is my new msg ", extra=logger.NODE_INFO)
+    Logger.setLogFormatting("config_node.log", Logger.getLogDir(), logging.WARN)                                                                        
+    Logger.setLogNodeInfo("<config_node#1234>", "CONFIG_NODE");
+    logging.warn("Hello this is my new msg ", extra=Logger.NODE_INFO)
 
     if len(sys.argv) > 1:
         config_file = sys.argv[1]
