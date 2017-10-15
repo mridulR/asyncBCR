@@ -107,8 +107,8 @@ def main():
     # This includes sending the configuration file and repective client no
 
     for client_no in range(0, int(config[client.NUM_OF_CLIENTS])):
-        setup(client_list[client_no], [config_file, client_no, oly,
-              replica_list])
+        setup(client_list[client_no], [config_file, client_no, oly, oly_name,
+              replica_list, client_name[client_no], client_list[client_no]])
         logging.info("Setting up client- ClientId: %s ClientName: %s",
                      client_list[client_no], client_name[client_no],
                      extra=Logger.NODE_INFO)

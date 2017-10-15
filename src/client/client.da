@@ -1,41 +1,99 @@
-from src.utils import Logger 
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
 import sys
 import os
 import logging
 import time
-
+from src.utils import Logger
 
 # Configuration keys for client
-NUM_OF_CLIENTS = "num_client"
-CLIENT_TIMEOUT = "client_timeout"
-CLIENT_HOSTS = "client_hosts"
-    
+
+NUM_OF_CLIENTS = 'num_client'
+CLIENT_TIMEOUT = 'client_timeout'
+CLIENT_HOSTS = 'client_hosts'
+
+
 class client(process):
-    
-    #TODO: Don't send replica_list but get it in message
-    def setup(config_file, client_no, olympus, replica_list):
+
+    # TODO: Don't send replica_list but get it in message
+
+    def setup(config_file, client_no, olympus, olympus_name, replica_list,
+              name, nodeId,):
+
+        # Update the params
+
         self.config_file = config_file
         self.client_no = client_no
         self.olympus = olympus
+        self.olympus_name = olympus_name
         self.replica_list = replica_list
-    
-    #TODO: Fix this for replica list not replica_no
-    def receive(msg=('rcv_curr_config', replicas,), from_ = self.olympus):
-        output("Received curr_config response from olympus. size : " + replicas)
+        self.name = name
+        self.nodeId = nodeId
+
+        # Setting the logging format for the CONFIG_NODE
+        # Default logging is INFO for CONFIG_NODE.
+        # Other applicable values - logging.WARN, logging.CRITICAL,
+        # logging.ERROR, logging.DEBUG
+        # Use respective logging.warn, logging.critical, logging.error,
+        # logging.debug
+
+        Logger.setLogFormatting(self.name + '.log', Logger.getLogDir(),
+                                logging.INFO)
+        Logger.setLogNodeInfo(self.nodeId, self.name)
+
+        # Log the received values
+
+        logging.info("Client {clientId: %s, clientName: %s} received setup - "  +
+                     "config_file: %s client_no: %s olympus - {olympusId: %s, " +
+                     "olympusName: %s} replica_list: %s", self.nodeId,
+                     self.name, self.config_file, str(self.client_no),
+                     self.olympus, self.olympus_name, self.replica_list,
+                     extra=Logger.NODE_INFO)
+        return
+
+    # TODO: Fix this for replica list not replica_no
+
+    def receive(msg=('rcv_curr_config', replicas), from_=self.olympus):
+        output("Received curr_config response from olympus. size :" +
+               replicas)
         if int(replicas) > -1:
             print("Sending message to head : ")
-            send(('order_request', self, 'some_order',), to = self.replica_list[int(replicas)])
+            send(('order_request', self, 'some_order'),
+                 to=self.replica_list[int(replicas)])
         else:
             print("No replica to send order request to !!!")
 
-    def receive(msg=('result_proof', result_proof, replica_no,)):
-        output("Received result_proof from replica ReplicaNode" + str(replica_no))
+        return
+
+    def receive(msg=('result_proof', result_proof, replica_no)):
+        output("Received result_proof from replica ReplicaNode" +
+               str(replica_no))
         output(result_proof)
 
+        # TODO: Based on above todo fix this as well
+
+        logging.info("client { clientId: %s, clientName: %s} received " +
+                     "result_proof from replica {replicaId: %s, replicaName:" +
+                     "%s}", self.nodeId, self.name, str(replica_no),
+                     str(replica_no), extra=Logger.NODE_INFO)
+        return
+
     def run():
+
+        logging.info("Running client- clientId: %s clientName: %s",
+                     self.nodeId, self.name, extra=Logger.NODE_INFO)
+
+        print("I am in olympus run waiting to serve request")
         # Asking current configuration from olympus
+
         print("Asking current config from olympus")
-        send(('req_curr_config', self.client_no,), to = self.olympus)
+        logging.info("Client {clientId: %s, clientName: %s} sending request " +
+                     "for CURRENT_CONFIG to olympus {olympusId: %s," +
+                     "olympusName: %s} ", self.nodeId, self.name, self.olympus,
+                     self.olympus_name, extra=Logger.NODE_INFO)
+
+        send(('req_curr_config', self.client_no), to=self.olympus)
         while True:
-            await(received(('',)))
-         
+            await(received(('', )))
+
+        return
