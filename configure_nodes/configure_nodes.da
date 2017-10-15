@@ -46,7 +46,6 @@ def main():
     if olympus_host != 'localhost':
         node_name += "@" + olympus_host
     oly = new(olympus.olympus, num=1, at=node_name)
-    setup(oly, [config_file])
     
     client_hosts = [int(cl_host) for cl_host in config[client.CLIENT_HOSTS].split(';')]
     # Initialize clients at respective hosts.
@@ -58,11 +57,6 @@ def main():
         if host_name != 'localhost':
             node_name += "@" + host_name
         client_list.append(new(client.client, num=1, at=node_name))
-
-    # After clients have been initialized, call setup on respective client nodes
-    # This includes sending the configuration file and repective client no
-    for client_no in range(0, int(config[client.NUM_OF_CLIENTS])):
-        setup(client_list[client_no], [config_file, client_no, oly])
 
     replica_hosts = [int(rep_host) for rep_host in config[replica.REPLICA_HOSTS].split(';')]
     # Initialize replicas at respective hosts.
@@ -79,8 +73,16 @@ def main():
     # After clients have been initialized, call setup on respective client nodes
     # This includes sending the configuration file and repective client no
     for replica_no in range(0, num_of_replicas):
-        setup(replica_list[replica_no], [config_file, replica_no, replica_list])
+        setup(replica_list[replica_no], [config_file, replica_no, replica_list, oly])
+    
+    #TODO: Don't pass replica list from here
+    # After clients have been initialized, call setup on respective client nodes
+    # This includes sending the configuration file and repective client no
+    for client_no in range(0, int(config[client.NUM_OF_CLIENTS])):
+        setup(client_list[client_no], [config_file, client_no, oly, replica_list])
 
+    setup(oly, [config_file, client_list, replica_list])
+    
     # Start olympus
     start(oly)
     time.sleep(2)

@@ -7,10 +7,30 @@ CLIENT_HOSTS = "client_hosts"
     
 class client(process):
     
-    def setup(config_file, client_no, olympus):
+    #TODO: Don't send replica_list but get it in message
+    def setup(config_file, client_no, olympus, replica_list):
         self.config_file = config_file
         self.client_no = client_no
-        self.olympus = olympus        
+        self.olympus = olympus
+        self.replica_list = replica_list
+    
+    #TODO: Fix this for replica list not replica_no
+    def receive(msg=('rcv_curr_config', replicas,), from_ = self.olympus):
+        output("Received curr_config response from olympus. size : " + replicas)
+        if int(replicas) > -1:
+            print("Sending message to head : ")
+            send(('order_request', self, 'some_order',), to = self.replica_list[int(replicas)])
+        else:
+            print("No replica to send order request to !!!")
+
+    def receive(msg=('result_proof', result_proof, replica_no,)):
+        output("Received result_proof from replica ReplicaNode" + str(replica_no))
+        output(result_proof)
 
     def run():
-        pass 
+        # Asking current configuration from olympus
+        print("Asking current config from olympus")
+        send(('req_curr_config', self.client_no,), to = self.olympus)
+        while True:
+            await(received(('',)))
+         
