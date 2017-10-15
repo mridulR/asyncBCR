@@ -7,9 +7,10 @@ CLIENT_HOSTS = "client_hosts"
     
 class client(process):
     
-    def setup(config_file, client_no):
+    def setup(config_file, client_no, olympus):
         self.config_file = config_file
-        self.client_no = client_no        
+        self.client_no = client_no
+        self.olympus = olympus        
 
     def run():
         pass 
