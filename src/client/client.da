@@ -2,14 +2,14 @@ import time
 
 # Configuration keys for client
 NUM_OF_CLIENTS = "num_client"
+CLIENT_TIMEOUT = "client_timeout"
+CLIENT_HOSTS = "client_hosts"
     
 class client(process):
     
-    def setup():
-        pass
+    def setup(config_file, client_no):
+        self.config_file = config_file
+        self.client_no = client_no        
 
     def run():
-        pass
-    
-def main():
-    print("I am Client!!! --- ")
+        pass 

@@ -30,53 +30,62 @@ def main():
     else:
         print("No configuration file is passed. Picking default : /config/config.csv")
 
-    config = config_parser.get_config(config_file)
-    print("num of clients ", config[client.NUM_OF_CLIENTS])
-
-    # Start client.
-    # Number of clients, their hosts and timeout is read from config file
+    config = config_parser.get_config(config_file) 
+    hosts = [each_host.strip() for each_host in config[config_parser.HOSTS].split(';')]
     
-        
-    
+    client_hosts = [int(cl_host) for cl_host in config[client.CLIENT_HOSTS].split(';')]
+    # Initialize clients at respective hosts.
+    # Number of clients and their hosts is read from config file
+    client_list = []
+    for client_no in range(0, int(config[client.NUM_OF_CLIENTS])):
+        node_name = "ClientNode" + str(client_no)
+        host_name = hosts[client_hosts[client_no]]  #TODO: Right now only supporting localhost.
+        if host_name != 'localhost':
+            node_name += "@" + host_name
+        client_list.append(new(client.client, num=1, at=node_name))
 
-    # Start Olympus for now
-    node_name = 'OlympusNode'
+    # After clients have been initialized, call setup on respective client nodes
+    # This includes sending the configuration file and repective client no
+    for client_no in range(0, int(config[client.NUM_OF_CLIENTS])):
+        setup(client_list[client_no], [config_file, client_no])
 
-    oly = new(olympus.olympus, args=("dummy",), at="oly")
-    replicas = []
-    rep1 = new(replica.replica, num=1, at = "ReplicaNode1")
-    rep2 = new(replica.replica, num=1, at = "ReplicaNode2")
-    rep3 = new(replica.replica, num=1, at = "ReplicaNode3")
+    # Initialize olympus at respective host.
+    olympus_host = hosts[int(config[olympus.HOST])]
+    node_name = "OlympusNode"
+    if olympus_host != 'localhost':
+        node_name += "@" + olympus_host
+    oly = new(olympus.olympus, num=1, at=node_name)
+    setup(oly, [config_file])
 
-    replicas.extend(rep1)
-    replicas.extend(rep2)
-    replicas.extend(rep3)
+    replica_hosts = [int(rep_host) for rep_host in config[replica.REPLICA_HOSTS].split(';')]
+    # Initialize replicas at respective hosts.
+    # Number of replicas and their hosts is read from config file
+    replica_list = []
+    num_of_replicas = (2 * int(config[replica.FAILURES_TO_TOLERATE])) + 1
+    for replica_no in range(0, num_of_replicas):
+        node_name = "ReplicaNode" + str(replica_no)
+        host_name = hosts[replica_hosts[replica_no]]  #TODO: Right now only supporting localhost.
+        if host_name != 'localhost':
+            node_name += "@" + host_name
+        replica_list.append(new(replica.replica, num=1, at=node_name))
+ 
+    # After clients have been initialized, call setup on respective client nodes
+    # This includes sending the configuration file and repective client no
+    for replica_no in range(0, num_of_replicas):
+        setup(replica_list[replica_no], [config_file, replica_no, replica_list])
 
-    print(replicas)
-    for ind in range(len(replicas)):
-        if ind == 0: 
-            setup(replicas[0], [replicas, None, replicas[ind], replicas[1]])
-        elif ind == len(replicas) - 1:
-            setup(replicas[ind], [replicas, replicas[ind - 1], replicas[ind], None])
-        else:
-            setup(replicas[ind], [replicas, replicas[ind - 1], replicas[ind], replicas[ind + 1]])
-
+    # Start olympus
     start(oly)
-    start(rep1)
-    start(rep2)
-    start(rep3)
+    time.sleep(2)
+    
+    # Start replicas
+    for rep in replica_list:
+        start(rep)
+        time.sleep(2)
 
-    '''cmd = 'python3 -m da -n '+ node_name + ' -f --logfilename logs/' + node_name \
-        + '.log' + ' -L info ' + ' src/olympus/olympus.da ' + config_file
-    subprocess.Popen(cmd, shell= True)
-    time.sleep(1)'''
-
-    # Start Client for now
-    '''node_name = 'ClientNode'
-    cmd = 'python3 -m da -n '+ node_name + ' -f --logfilename logs/' + node_name \
-        + '.log' + ' -L info ' + ' src/client/client.da ' + config_file
-    subprocess.Popen(cmd, shell= True)
-    time.sleep(1)'''
-
+    # Start clients
+    for cli in client_list:
+        start(cli)
+        time.sleep(2)
+    
     print("Env set up has been done.Procced")
-

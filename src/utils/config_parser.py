@@ -1,5 +1,7 @@
 import pprint
 
+HOSTS = "hosts"
+
 
 def get_config(full_path):
     with open(full_path, 'r') as f:

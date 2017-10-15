@@ -3,6 +3,9 @@ import subprocess
 import time
 from src.replicas.replica import replica
 
+# Configuration Params to be read from config file
+HOST = "olympus_host"
+
 class olympus(process):
     def setup(config_file):
         self.config_file = config_file
