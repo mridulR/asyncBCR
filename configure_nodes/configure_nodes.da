@@ -1,8 +1,10 @@
 from src.utils import config_parser
+from src.utils import logger 
 import sys
 import subprocess
 import time
 import os
+import logging
 
 replica = import_da("src.replicas.replica")
 olympus = import_da("src.olympus.olympus")
@@ -25,6 +27,11 @@ def main():
 
     # Read configuration
     config_file = 'config/config.csv'
+    
+    logger.setLogFormatting("config_node.log", logger.getLogDir(), logging.WARN)                                                                        
+    logger.setLogNodeInfo("<config_node#1234>", "CONFIG_NODE");
+    logging.warn("Hello this is my new msg ", extra=logger.NODE_INFO)
+
     if len(sys.argv) > 1:
         config_file = sys.argv[1]
     else:
