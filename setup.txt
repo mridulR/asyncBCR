@@ -1,0 +1,5 @@
+
+  Run starting script:
+
+    python3 -m da  -n cofig_node configure_nodes/configure_nodes.da <path of config file>
+
