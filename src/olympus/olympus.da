@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 import sys
@@ -42,7 +42,7 @@ class olympus(process):
         return
 
     def receive(msg=('req_curr_config', client_no)):
-        logging.info('Received request CURRENT_CONFIG from ClientNode%s',
+        logging.info("Received request CURRENT_CONFIG from ClientNode%s",
                      str(client_no), extra=Logger.NODE_INFO)
         if client_no > -1 and client_no < len(self.client_list):
             print("Valid client: ", client_no)
@@ -61,8 +61,8 @@ class olympus(process):
                           extra=Logger.INFO)
 
     def run():
-        logging.info('Running Olympus- OlympusId: %s OlympusName: %s',
+        logging.info("Running Olympus- OlympusId: %s OlympusName: %s",
                      self.nodeId, self.name, extra=Logger.NODE_INFO)
-        print 'I am in olympus run waiting to serve request'
+        print("I am in olympus run waiting to serve request")
         while True:
             await(received(('', )))
