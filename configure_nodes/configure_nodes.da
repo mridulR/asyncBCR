@@ -26,76 +26,105 @@ Responsibility:
 def main():
 
     # Read configuration
-    config_file = 'config/config.csv'
-    
-    Logger.setLogFormatting("config_node.log", Logger.getLogDir(), logging.WARN)                                                                        
+    config_file='config/config.csv'
+
+    #Setting the logging format for the CONFIG_NODE    
+    #Default logging is INFO for CONFIG_NODE.
+    #Other applicable values - logging.WARN, logging.CRITICAL, logging.ERROR, logging.DEBUG
+    #Use respective logging.warn, logging.critical, logging.error, logging.debug
+    Logger.setLogFormatting("config_node.log", Logger.getLogDir(), logging.INFO)
     Logger.setLogNodeInfo("<config_node#1234>", "CONFIG_NODE");
-    logging.warn("Hello this is my new msg ", extra=Logger.NODE_INFO)
 
     if len(sys.argv) > 1:
         config_file = sys.argv[1]
     else:
         print("No configuration file is passed. Picking default : /config/config.csv")
+        logging.info("No configuration file is passed. Picking default :\
+                      /config/config.csv", extra=Logger.NODE_INFO)
 
     config = config_parser.get_config(config_file) 
     hosts = [each_host.strip() for each_host in config[config_parser.HOSTS].split(';')]
 
     # Initialize olympus at respective host.
     olympus_host = hosts[int(config[olympus.HOST])]
-    node_name = "OlympusNode"
+    oly_name = "OlympusNode"
     if olympus_host != 'localhost':
         node_name += "@" + olympus_host
-    oly = new(olympus.olympus, num=1, at=node_name)
+    oly = new(olympus.olympus, num=1, at=oly_name)
     
     client_hosts = [int(cl_host) for cl_host in config[client.CLIENT_HOSTS].split(';')]
     # Initialize clients at respective hosts.
     # Number of clients and their hosts is read from config file
     client_list = []
+    client_name = []
     for client_no in range(0, int(config[client.NUM_OF_CLIENTS])):
         node_name = "ClientNode" + str(client_no)
-        host_name = hosts[client_hosts[client_no]]  #TODO: Right now only supporting localhost.
+        #TODO: Right now only supporting localhost.
+        host_name = hosts[client_hosts[client_no]]  
         if host_name != 'localhost':
             node_name += "@" + host_name
         client_list.append(new(client.client, num=1, at=node_name))
+        client_name.append(node_name)
+        logging.info("Created client- ClientId: %s ClientName:\
+                      %s",client_list[-1], client_name[-1],\
+                      extra=Logger.NODE_INFO)
 
     replica_hosts = [int(rep_host) for rep_host in config[replica.REPLICA_HOSTS].split(';')]
     # Initialize replicas at respective hosts.
     # Number of replicas and their hosts is read from config file
     replica_list = []
+    replica_name = []
     num_of_replicas = (2 * int(config[replica.FAILURES_TO_TOLERATE])) + 1
     for replica_no in range(0, num_of_replicas):
         node_name = "ReplicaNode" + str(replica_no)
-        host_name = hosts[replica_hosts[replica_no]]  #TODO: Right now only supporting localhost.
+        #TODO: Right now only supporting localhost.
+        host_name = hosts[replica_hosts[replica_no]]
         if host_name != 'localhost':
             node_name += "@" + host_name
         replica_list.append(new(replica.replica, num=1, at=node_name))
+        replica_name.append(node_name)
+        logging.info("Created replica- ReplicaId: %s ReplicaName: %s",\
+                      replica_list[-1], replica_name[-1],\
+                      extra=Logger.NODE_INFO)
  
     # After clients have been initialized, call setup on respective client nodes
     # This includes sending the configuration file and repective client no
     for replica_no in range(0, num_of_replicas):
         setup(replica_list[replica_no], [config_file, replica_no, replica_list, oly])
+        logging.info("Setting up replica- ReplicaId: %s ReplicaName: %s",\
+                      replica_list[replica_no], replica_name[replica_no],\
+                      extra=Logger.NODE_INFO)
     
     #TODO: Don't pass replica list from here
     # After clients have been initialized, call setup on respective client nodes
     # This includes sending the configuration file and repective client no
     for client_no in range(0, int(config[client.NUM_OF_CLIENTS])):
         setup(client_list[client_no], [config_file, client_no, oly, replica_list])
+        logging.info("Setting up client- ClientId: %s ClientName: %s",\
+                      client_list[client_no], client_name[client_no],\
+                      extra=Logger.NODE_INFO)
+ 
 
-    setup(oly, [config_file, client_list, replica_list])
+    setup(oly, [config_file, client_list, replica_list, oly_name, oly])
+    logging.info("Setting up olympus- OlympusId: %s OlympusName: %s",oly, oly_name, extra=Logger.NODE_INFO)
     
     # Start olympus
     start(oly)
+    logging.info("Starting olympus- OlympusId: %s OlympusName: %s",oly, oly_name, extra=Logger.NODE_INFO)
     time.sleep(2)
    
     #TODO: Replicas should be started by olympus. Figure out a way to call new from run. 
     # Start replicas
-    for rep in replica_list:
+    for (rep,rep_name) in zip(replica_list,replica_name):
         start(rep)
+        logging.info("Starting replica- ReplicaId: %s ReplicaName: %s",rep, rep_name, extra=Logger.NODE_INFO)
         time.sleep(2)
 
     # Start clients
-    for cli in client_list:
+    for (cli,cli_name) in zip(client_list, client_name):
         start(cli)
+        logging.info("Starting client- ClientId: %s ClientName: %s",cli, cli_name, extra=Logger.NODE_INFO)
         time.sleep(2)
     
     print("Env set up has been done.Procced")
+    logging.info("Environment set has been done. Proceeding...", extra=Logger.NODE_INFO)

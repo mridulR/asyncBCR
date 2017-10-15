@@ -1,24 +1,53 @@
+from src.utils import Logger 
+import sys
+import os
+import logging
 
 # Configuration Params to be read from config file
 HOST = "olympus_host"
 
 class olympus(process):
 
-    def setup(config_file, client_list, replica_list):
+    def setup(config_file, client_list, replica_list, name, nodeId):
+
+        #Setting the logging format for the CONFIG_NODE    
+        #Default logging is INFO for CONFIG_NODE.
+        #Other applicable values - logging.WARN, logging.CRITICAL, logging.ERROR, logging.DEBUG
+        #Use respective logging.warn, logging.critical, logging.error, logging.debug
+        Logger.setLogFormatting(self.name+".log", Logger.getLogDir(), logging.INFO)
+        Logger.setLogNodeInfo(self.nodeId, self.name);
+
+        # Update the params
         self.config_file = config_file
         self.client_list = client_list
         self.replica_list = replica_list
+        self.name = name
+        self.nodeId = nodeId
+        
+        #Log the received values
+        logging.info("Received setup - config_file: %s client_list: %s\
+                      replica_list: %s", self.config_file, self.client_list,\
+                      replica_list, extra=Logger.NODE_INFO)
+        return
 
     def receive(msg=('req_curr_config', client_no, )):
         output("Received curr_config request from client ClientNode" + str(client_no))
+        logging.info("Received request CURRENT_CONFIG from ClientNode%s",\
+                      str(client_no), extra=Logger.NODE_INFO)
         if client_no > -1 and client_no < len(self.client_list):
             print("Valid client : ", client_no)
             print(client_list)
+            logging.info("Sending CURRENT_CONFIG to client - ClientId: %s,\
+                          ClientName: ClientNode%s", self.client_list[client_no],\
+                          str(client_no), extra=Logger.NODE_INFO)
             send(('rcv_curr_config', "0",), to = self.client_list[client_no])
         else:
             print("Illegal client")
+            Logger.setLogFormatting(self.name+".log", Logger.getLogDir(), logging.ERROR)
+            logging.error("Request from illegal client", extra=Logger.INFO)\
 
     def run():
+        logging.info("Running Olympus- OlympusId: %s OlympusName: %s", self.nodeId, self.name, extra=Logger.NODE_INFO)
         print("I am in olympus run waiting to serve request")
         while True:
             await(received(('',)))

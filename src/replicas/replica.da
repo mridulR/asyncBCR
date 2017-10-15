@@ -1,4 +1,7 @@
+from src.utils import Logger 
 import sys
+import os
+import logging
 import time
 
 REPLICA_HOSTS = "replica_hosts"
