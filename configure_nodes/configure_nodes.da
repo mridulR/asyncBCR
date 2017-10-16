@@ -113,7 +113,7 @@ def main():
                      client_list[client_no], client_name[client_no],
                      extra=Logger.NODE_INFO)
 
-    setup(oly, [config_file, client_list, replica_list, oly_name, oly])
+    setup(oly, [config_file, replica_list, oly_name, oly])
     logging.info("Setting up olympus- OlympusId: %s OlympusName: %s", oly,
                  oly_name, extra=Logger.NODE_INFO)
 

@@ -13,15 +13,7 @@ HOST = 'olympus_host'
 
 class olympus(process):
 
-    def setup(config_file, client_list, replica_list, name, nodeId,):
-
-        # Update the params
-
-        self.config_file = config_file
-        self.client_list = client_list
-        self.replica_list = replica_list
-        self.name = name
-        self.nodeId = nodeId
+    def setup(config_file, replica_list, name, nodeId,):
 
         # Setting the logging format for the CONFIG_NODE
         # Default logging is INFO for CONFIG_NODE.
@@ -36,22 +28,19 @@ class olympus(process):
 
         # Log the received values
 
-        logging.info("Received setup - config_file: %s client_list: %s " +
-                     "replica_list: %s", self.config_file, self.client_list,
+        logging.info("Received setup - config_file: %s " +
+                     "replica_list: %s", self.config_file,
                      replica_list, extra=Logger.NODE_INFO)
         return
 
-    def receive(msg=('req_curr_config', client_no)):
-        logging.info("Received request CURRENT_CONFIG from ClientNode%s",
-                     str(client_no), extra=Logger.NODE_INFO)
-        if client_no > -1 and client_no < len(self.client_list):
-            logging.info("Sending CURRENT_CONFIG to client - ClientId: %s," +
-                         "ClientName: ClientNode%s",
-                         self.client_list[client_no], str(client_no),
+    def receive(msg=('req_curr_config', client)):
+        logging.info("Received request CURRENT_CONFIG from %s",
+                     str(client), extra=Logger.NODE_INFO)
+        if client != None:
+            logging.info("Sending CURRENT_CONFIG to : %s", str(client),
                          extra=Logger.NODE_INFO)
 
-            send(('rcv_curr_config', self.replica_list),
-                 to=self.client_list[client_no])
+            send(('rcv_curr_config', self.replica_list),to=client)
         else:
             Logger.setLogFormatting(self.name + '.log',
                                     Logger.getLogDir(), logging.ERROR)

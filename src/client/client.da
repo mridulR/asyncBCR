@@ -15,19 +15,8 @@ CLIENT_HOSTS = 'client_hosts'
 
 class client(process):
 
-    # TODO: Don't send replica_list but get it in message
-
     def setup(config_file, client_no, olympus, olympus_name,
               name, nodeId,):
-
-        # Update the params
-
-        self.config_file = config_file
-        self.client_no = client_no
-        self.olympus = olympus
-        self.olympus_name = olympus_name
-        self.name = name
-        self.nodeId = nodeId
 
         # Setting the logging format for the CONFIG_NODE
         # Default logging is INFO for CONFIG_NODE.
@@ -86,7 +75,7 @@ class client(process):
                      "olympusName: %s} ", self.nodeId, self.name, self.olympus,
                      self.olympus_name, extra=Logger.NODE_INFO)
 
-        send(('req_curr_config', self.client_no), to=self.olympus)
+        send(('req_curr_config', self), to=self.olympus)
         while True:
             await(received(('', )))
 

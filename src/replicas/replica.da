@@ -12,10 +12,6 @@ class replica(process):
     STATE = "PENDING"    
 
     def setup(config_file, replica_no, replicas, olympus):
-        self.config_file = config_file    
-        self.replica_no = replica_no
-        self.replicas = replicas
-        self.olympus = olympus
         
         ## Update next and previous replica by each replica
         self.num_of_replicas = len(replicas)
@@ -37,28 +33,28 @@ class replica(process):
         output("Received order request from " + str(client))
         if self.prev == None:
             print("Forwarding order request to next : ")
-            send(('order_request', client, order_req,), to = self.next_r)
+            send(('forward_shuttle', client, order_req,), to = self.next_r)
         else:
             print("I am not the head to take order request from client")
 
     # Order request forwarded from replicas
-    def receive(msg=('order_request', client, order_req,), from_ = self.prev):
+    def receive(msg=('forward_shuttle', client, order_req,), from_ = self.prev):
         output("Received order request from prev for client" + str(client))
         if self.next_r != None:
             print("Forwarding order request to next : ")
-            send(('order_request', client, order_req,), to = self.next_r)
+            send(('forward_shuttle', client, order_req,), to = self.next_r)
         else:
             print("I am the tail and sending to client")
             send(('result_proof', 'Some Result which is proof', self.replica_no,), to = client)
             print("sending result proof shuttle back")
-            send(('result_proof', 'Returning result proof',), to = self.prev)
+            send(('return_shuttle', 'Returning result proof',), to = self.prev)
     
     # Result proof handled from next
-    def receive(msg=('result_proof', result_proof,), from_ = self.next_r):
+    def receive(msg=('return_shuttle', result_proof,), from_ = self.next_r):
         output("Received  result from next")
         if self.prev != None:
             print("Forwarding result proof to prev : ")
-            send(('result_proof', result_proof,), to = self.prev)
+            send(('return_shuttle', result_proof,), to = self.prev)
         else:
             print("I am the Head and have received result proof shuttle")
             print(result_proof)
