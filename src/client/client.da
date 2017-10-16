@@ -77,17 +77,27 @@ class client(process):
                      "for CURRENT_CONFIG to olympus {olympusId: %s," +
                      "olympusName: %s} ", self.nodeId, self.name, self.olympus,
                      self.olympus_name, extra=Logger.NODE_INFO)
-
-        send(('req_curr_config', self), to=olympus)
-        await(some(received(('rcv_curr_config', _))))
-        if len(current_replicas) > 0:
-            send(('request_order', self, randint(1, 9000), 'some_order'),
-                    to=current_replicas[0])
-        print("time_out", time_out)
-        if await(len(setof(a, received(('result_proof', _, _), from_ =a))) > 0):
-            print("Result within time bound")
-        elif timeout(int(time_out) / 1000):
-            print("Time out is working")
+    
+        ##### Needs to be refactored
+        client_work_load = []
+        client_work_load.append("put('movie','star')")
+        client_work_load.append("append('movie',' wars')")
+        client_work_load.append("put('jedi','luke skywalker')")
+        #client_work_load.append("slice('jedi','0:4')")
+        client_work_load.append("get('jedi')")
+        client_work_load.append("get('movie')")
+        
+        for order in client_work_load:
+            send(('req_curr_config', self), to=olympus)
+            await(some(received(('rcv_curr_config', _))))
+            if len(current_replicas) > 0:
+                send(('request_order', self, randint(1, 9000), order),
+                        to=current_replicas[0])
+            print("time_out", time_out)
+            if await(len(setof(a, received(('result_proof', _, _), from_ =a))) > 0):
+                print("Result within time bound")
+            elif timeout(int(time_out) / 1000):
+                print("Time out is working")
         while True:
             await(received(('', )))
         return

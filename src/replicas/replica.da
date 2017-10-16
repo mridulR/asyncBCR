@@ -3,6 +3,7 @@ import sys
 import os
 import logging
 import time
+import re
 
 REPLICA_HOSTS = "replica_hosts"
 FAILURES_TO_TOLERATE = "t"
@@ -10,12 +11,14 @@ FAILURES_TO_TOLERATE = "t"
 class replica(process):    
 
     def setup(config_file, replica_no, replicas, olympus):
+        ## cache for storing result and result proof
+        self.cache = {}
         ## current_slot updated only by head replica
         self.current_slot = 0
         ## running state of replica
         self.running_state = {}
         ## history of replica
-        self.history = {}
+        self.history = []
 
         ## Update next and previous replica by each replica
         self.num_of_replicas = len(replicas)
@@ -32,33 +35,145 @@ class replica(process):
             self.me = replicas[replica_no]
             self.next_r = replicas[replica_no + 1]
 
+    def create_order_proof(slot_no, order_string):
+        ## TODO: Add digital signature as the last column
+        return (slot_no, order_string, replica_no)
+
+    def parse_order_string(order_string):
+        comm = -1
+        arg1 = None
+        arg2 = None
+        arg3 = None
+        if order_string.startswith('put'):
+            comm = 1
+            both_arg  = re.search(r'\((.*?)\)',order_string).group(1)
+            arguments = [each for each in both_arg.split(',')]
+            arg1 = arguments[0]
+            arg2 = arguments[1]
+        elif order_string.startswith('get'):
+            comm = 2
+            arg1 = re.search(r'\((.*?)\)',order_string).group(1)
+        elif order_string.startswith('slice'):
+            comm = 3
+            all_arg = re.search(r'\((.*?)\)',order_string).group(1)
+            arg1_pair = [each for each in all_arg.split(',')]
+            arg1 = arg1_pair[0]
+            arg2_3 = [each for each in arg1_pair[1].split(':')]
+            arg2 = arg2_3[0]
+            arg3 = arg2_3[1]
+        elif order_string.startswith('append'):
+            comm = 4
+            both_arg  = re.search(r'\((.*?)\)',order_string).group(1)
+            arguments = [each for each in both_arg.split(',')]
+            arg1 = arguments[0]
+            arg2 = arguments[1]
+
+        return comm, arg1, arg2, arg3
+
+    def get_result(order_string):
+        # command parsing 
+        #  1 - >  put (arg1, arg2)
+        #  2 - >  get (arg1)    arg2 is None
+        #  3 - >  slice (arg1, arg2:arg3)
+        #  4 - >  append (arg1, arg2)
+        comm, arg1, arg2, arg3 = parse_order_string(order_string)
+        result = ""
+        if comm == 1:
+            running_state[arg1] = arg2
+            result = "OK"
+        elif comm == 2:
+            if arg1 in running_state:
+                result = running_state[arg1]
+        elif comm == 3:
+            if arg1 in running_state:
+                curr_val = running_state[arg1]
+                if int(arg2) >= 0 and int(arg3) <= len(curr_val) and int(arg2) <= int(arg3):
+                    running_state[arg1] = curr_val[ int(arg2) : int(arg3) ]
+                    result = "OK"
+            else:
+                result = "FAIL"
+        elif comm == 4:
+            if arg1 in running_state:
+                curr_value = running_state[arg1]
+                running_state[arg1] = curr_value + arg2
+                result = "OK"
+            else:
+                result = "FAIL"
+        else:
+            print("Unrecognized command : ", order_string )
+            return None
+        return result
+
+    def get_result_proof(result):
+        ## TODO: complete it
+        return result
+
+    def is_valid_order_proof(order_proof):
+        ## TODO: complete it
+        return True
+
+    def get_slot_order(order_proof):
+        first_order_st = order_proof[0]
+        return first_order_st[0], first_order_st[1]
+
     # Only head is supposed to handle order request from client    
     def receive(msg=('request_order', client, unique_order_ide, order_req,)):
-        output("Received order request from " + str(client))
+        print("Received order request from " + str(client))
         if self.prev == None:
-            print("Forwarding order request to next : ")
-            send(('forward_shuttle', client, order_req,), to = self.next_r)
+            print("Forwarding order request to next : ", order_req)
+            self.current_slot += 1
+            ## No need to verify order proof at head
+            order_proof = []
+            ## order proof is a list of tuples (slot, order, replica, [digtal signs of preceding])
+            order_proof.append(create_order_proof(self.current_slot, order_req))
+            print("*****" + str(order_proof))
+            result = get_result(order_req)
+            if result != None:
+                cache[unique_order_ide] = [result, None] ## None for result proof which will be
+                                                     ## update in return shuttle
+                result_proof = []
+                result_proof.append(get_result_proof(result))          
+                send(('forward_shuttle', client, unique_order_ide, \
+                    order_proof, result_proof,), to = self.next_r)
         else:
             print("I am not the head to take order request from client")
 
     # Forward Shuttle to next
-    def receive(msg=('forward_shuttle', client, order_req,), from_ = self.prev):
+    def receive(msg=('forward_shuttle', client, unique_order_ide, order_proof, result_proof, ), from_ = self.prev):
         output("Received order request from prev for client" + str(client))
         if self.next_r != None:
-            print("Forwarding order request to next : ")
-            send(('forward_shuttle', client, order_req,), to = self.next_r)
+            print("Forwarding order request to next : ", order_proof)
+            if is_valid_order_proof(order_proof):
+                current_slot, order_req = get_slot_order(order_proof)
+                order_proof.append(create_order_proof(current_slot, order_req))
+                result = get_result(order_req)
+                cache[unique_order_ide] = [result]
+                result_proof.append(get_result_proof(result)) 
+                send(('forward_shuttle', client, unique_order_ide, \
+                     order_proof, result_proof,), to = self.next_r)
+            ## else make reconfiguration call to olympus
         else:
             print("I am the tail and sending to client")
-            send(('result_proof', 'Some Result which is proof', self.replica_no,), to = client)
-            print("sending result proof shuttle back")
-            send(('result_shuttle', 'Returning result proof',), to = self.prev)
+            if is_valid_order_proof(order_proof):
+                current_slot, order_req = get_slot_order(order_proof)
+                order_proof.append(create_order_proof(current_slot, order_req))
+                result = get_result(order_req)
+                cache[unique_order_ide] = [result]
+                result_proof.append(get_result_proof(result))
+                send(('result_proof', (result, result_proof), self.replica_no,), to = client)
+                history.append(order_proof)
+                print("sending result proof shuttle back")
+                send(('result_shuttle', unique_order_ide, result_proof,), to = self.prev)
     
     # Return Shuttle from next
-    def receive(msg=('result_shuttle', result_proof,), from_ = self.next_r):
+    def receive(msg=('result_shuttle', unique_order_ide, result_proof,), from_ = self.next_r):
         output("Received  result from next")
+        result_with_proof = cache[unique_order_ide]
+        result_with_proof.append(result_proof)
+        cache[unique_order_ide] = result_with_proof
         if self.prev != None:
             print("Forwarding result proof to prev : ")
-            send(('result_shuttle', result_proof,), to = self.prev)
+            send(('result_shuttle', unique_order_ide, result_proof,), to = self.prev)
         else:
             print("I am the Head and have received result proof shuttle")
             print(result_proof)
