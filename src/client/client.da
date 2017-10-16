@@ -5,6 +5,7 @@ import os
 import logging
 import time
 from src.utils import Logger
+from src.utils import config_parser
 
 # Configuration keys for client
 
@@ -17,6 +18,9 @@ class client(process):
 
     def setup(config_file, client_no, olympus, olympus_name,
               name, nodeId,):
+
+        config = config_parser.get_config(config_file)
+        self.time_out = config[CLIENT_TIMEOUT]
 
         self.current_replicas = []
         # Setting the logging format for the CONFIG_NODE
@@ -48,7 +52,7 @@ class client(process):
             print("No replica to send order request to !!!")
 
         return
-        
+
 
     def receive(msg=('result_proof', result_proof, replica_no)):
         output("Received result_proof from replica ReplicaNode", str(replica_no))
@@ -67,9 +71,6 @@ class client(process):
         logging.info("Running client- clientId: %s clientName: %s",
                      self.nodeId, self.name, extra=Logger.NODE_INFO)
 
-        print("I am in olympus run waiting to serve request")
-        # Asking current configuration from olympus
-
         print("Asking current config from olympus")
         logging.info("Client {clientId: %s, clientName: %s} sending request " +
                      "for CURRENT_CONFIG to olympus {olympusId: %s," +
@@ -81,6 +82,13 @@ class client(process):
         if len(current_replicas) > 0:
             send(('request_order', self, 'unique_order_identifier', 'some_order'),
                     to=current_replicas[0])
+        print("time_out", time_out)
+        if await(len(setof(a, received(('result_proof', _, _), from_ =a))) > 0):
+            print("Result within time bound")
+        elif timeout(int(time_out) / 1000):
+            print("Time out is working")
+        else:
+            print("This is else")
         while True:
             await(received(('', )))
 
