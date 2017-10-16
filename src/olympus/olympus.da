@@ -45,14 +45,12 @@ class olympus(process):
         logging.info("Received request CURRENT_CONFIG from ClientNode%s",
                      str(client_no), extra=Logger.NODE_INFO)
         if client_no > -1 and client_no < len(self.client_list):
-            print("Valid client: ", client_no)
-            print(client_list)
             logging.info("Sending CURRENT_CONFIG to client - ClientId: %s," +
                          "ClientName: ClientNode%s",
                          self.client_list[client_no], str(client_no),
                          extra=Logger.NODE_INFO)
 
-            send(('rcv_curr_config', '0'),
+            send(('rcv_curr_config', self.replica_list),
                  to=self.client_list[client_no])
         else:
             Logger.setLogFormatting(self.name + '.log',

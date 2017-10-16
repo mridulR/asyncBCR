@@ -17,7 +17,7 @@ class client(process):
 
     # TODO: Don't send replica_list but get it in message
 
-    def setup(config_file, client_no, olympus, olympus_name, replica_list,
+    def setup(config_file, client_no, olympus, olympus_name,
               name, nodeId,):
 
         # Update the params
@@ -26,7 +26,6 @@ class client(process):
         self.client_no = client_no
         self.olympus = olympus
         self.olympus_name = olympus_name
-        self.replica_list = replica_list
         self.name = name
         self.nodeId = nodeId
 
@@ -45,29 +44,24 @@ class client(process):
 
         logging.info("Client {clientId: %s, clientName: %s} received setup - "  +
                      "config_file: %s client_no: %s olympus - {olympusId: %s, " +
-                     "olympusName: %s} replica_list: %s", self.nodeId,
+                     "olympusName: %s}", self.nodeId,
                      self.name, self.config_file, str(self.client_no),
-                     self.olympus, self.olympus_name, self.replica_list,
+                     self.olympus, self.olympus_name,
                      extra=Logger.NODE_INFO)
         return
 
-    # TODO: Fix this for replica list not replica_no
-
     def receive(msg=('rcv_curr_config', replicas), from_=self.olympus):
-        output("Received curr_config response from olympus. size :" +
-               replicas)
-        if int(replicas) > -1:
+        if int(len(replicas)) > 0:
             print("Sending message to head : ")
             send(('order_request', self, 'some_order'),
-                 to=self.replica_list[int(replicas)])
+                 to=replicas[0])
         else:
             print("No replica to send order request to !!!")
 
         return
 
     def receive(msg=('result_proof', result_proof, replica_no)):
-        output("Received result_proof from replica ReplicaNode" +
-               str(replica_no))
+        output("Received result_proof from replica ReplicaNode", str(replica_no))
         output(result_proof)
 
         # TODO: Based on above todo fix this as well
