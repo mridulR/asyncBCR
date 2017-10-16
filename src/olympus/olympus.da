@@ -51,5 +51,6 @@ class olympus(process):
         logging.info("Running Olympus- OlympusId: %s OlympusName: %s",
                      self.nodeId, self.name, extra=Logger.NODE_INFO)
         print("I am in olympus run waiting to serve request")
+        
         while True:
             await(received(('', )))

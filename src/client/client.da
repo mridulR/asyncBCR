@@ -18,6 +18,7 @@ class client(process):
     def setup(config_file, client_no, olympus, olympus_name,
               name, nodeId,):
 
+        self.current_replicas = []
         # Setting the logging format for the CONFIG_NODE
         # Default logging is INFO for CONFIG_NODE.
         # Other applicable values - logging.WARN, logging.CRITICAL,
@@ -38,16 +39,16 @@ class client(process):
                      self.olympus, self.olympus_name,
                      extra=Logger.NODE_INFO)
         return
-
+        
     def receive(msg=('rcv_curr_config', replicas), from_=self.olympus):
         if int(len(replicas)) > 0:
-            print("Sending message to head : ")
-            send(('order_request', self, 'some_order'),
-                 to=replicas[0])
+            print("Setting current replicas set message to head : ")
+            self.current_replicas = replicas
         else:
             print("No replica to send order request to !!!")
 
         return
+        
 
     def receive(msg=('result_proof', result_proof, replica_no)):
         output("Received result_proof from replica ReplicaNode", str(replica_no))
@@ -75,7 +76,11 @@ class client(process):
                      "olympusName: %s} ", self.nodeId, self.name, self.olympus,
                      self.olympus_name, extra=Logger.NODE_INFO)
 
-        send(('req_curr_config', self), to=self.olympus)
+        send(('req_curr_config', self), to=olympus)
+        await(some(received(('rcv_curr_config', _))))
+        if len(current_replicas) > 0:
+            send(('request_order', self, 'unique_order_identifier', 'some_order'),
+                    to=current_replicas[0])
         while True:
             await(received(('', )))
 

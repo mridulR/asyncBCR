@@ -9,10 +9,12 @@ FAILURES_TO_TOLERATE = "t"
 
 class replica(process):    
 
-    STATE = "PENDING"    
-
     def setup(config_file, replica_no, replicas, olympus):
-        
+        ## current_slot updated only by head replica
+        self.current_slot = 0
+        ## Local history of replica
+        self.history = {}
+
         ## Update next and previous replica by each replica
         self.num_of_replicas = len(replicas)
         if replica_no == 0:
@@ -27,9 +29,9 @@ class replica(process):
             self.prev = replicas[replica_no - 1]
             self.me = replicas[replica_no]
             self.next_r = replicas[replica_no + 1]
-    
+
     # Only head is supposed to handle order request from client    
-    def receive(msg=('order_request', client, order_req,)):
+    def receive(msg=('request_order', client, unique_order_ide, order_req,)):
         output("Received order request from " + str(client))
         if self.prev == None:
             print("Forwarding order request to next : ")
@@ -37,7 +39,7 @@ class replica(process):
         else:
             print("I am not the head to take order request from client")
 
-    # Order request forwarded from replicas
+    # Forward Shuttle to next
     def receive(msg=('forward_shuttle', client, order_req,), from_ = self.prev):
         output("Received order request from prev for client" + str(client))
         if self.next_r != None:
@@ -47,42 +49,20 @@ class replica(process):
             print("I am the tail and sending to client")
             send(('result_proof', 'Some Result which is proof', self.replica_no,), to = client)
             print("sending result proof shuttle back")
-            send(('return_shuttle', 'Returning result proof',), to = self.prev)
+            send(('result_shuttle', 'Returning result proof',), to = self.prev)
     
-    # Result proof handled from next
-    def receive(msg=('return_shuttle', result_proof,), from_ = self.next_r):
+    # Return Shuttle from next
+    def receive(msg=('result_shuttle', result_proof,), from_ = self.next_r):
         output("Received  result from next")
         if self.prev != None:
             print("Forwarding result proof to prev : ")
-            send(('return_shuttle', result_proof,), to = self.prev)
+            send(('result_shuttle', result_proof,), to = self.prev)
         else:
             print("I am the Head and have received result proof shuttle")
             print(result_proof)
-
-    '''    
-    def receive(msg=('test', ), from_= self.prev):
-        output("Received data from " + str(self.prev))
-        if self.next_r == None:
-            print("Sending to client : ")
-            send(('reverse',), to = self.prev)
-        else:
-            send(('test',), to = self.next_r)
-
-    def receive(msg=('reverse', ), from_= self.next_r):
-        output("Received data from " + str(self.next_r))
-        if self.prev == None:
-            print("Shutttle back to head : ")
-        else:
-            send(('reverse',), to = self.prev)
-    '''   
-   
+    
     def run():
-        print("Before Sending -- ", str(self.me))
-        ''' 
-        if self.prev == None:
-            print("Sending -- ", str(self.me), str(self.next_r))
-            send(('test',), to = self.next_r)
-        '''
+        print("Replica : ", str(self.me))
         while True:
             await(received(('',)))
 
