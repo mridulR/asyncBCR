@@ -12,7 +12,9 @@ class replica(process):
     def setup(config_file, replica_no, replicas, olympus):
         ## current_slot updated only by head replica
         self.current_slot = 0
-        ## Local history of replica
+        ## running state of replica
+        self.running_state = {}
+        ## history of replica
         self.history = {}
 
         ## Update next and previous replica by each replica

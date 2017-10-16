@@ -6,6 +6,7 @@ import logging
 import time
 from src.utils import Logger
 from src.utils import config_parser
+from random import randint
 
 # Configuration keys for client
 
@@ -80,16 +81,13 @@ class client(process):
         send(('req_curr_config', self), to=olympus)
         await(some(received(('rcv_curr_config', _))))
         if len(current_replicas) > 0:
-            send(('request_order', self, 'unique_order_identifier', 'some_order'),
+            send(('request_order', self, randint(1, 9000), 'some_order'),
                     to=current_replicas[0])
         print("time_out", time_out)
         if await(len(setof(a, received(('result_proof', _, _), from_ =a))) > 0):
             print("Result within time bound")
         elif timeout(int(time_out) / 1000):
             print("Time out is working")
-        else:
-            print("This is else")
         while True:
             await(received(('', )))
-
         return
