@@ -97,12 +97,11 @@ def main():
 
     for replica_no in range(0, num_of_replicas):
         setup(replica_list[replica_no], [config_file, replica_no, replica_list,
-              oly])
+                replica_name, oly])
         logging.info("Setting up replica- ReplicaId: %s ReplicaName: %s",
                      replica_list[replica_no], replica_name[replica_no],
                      extra=Logger.NODE_INFO)
 
-    # TODO: Don't pass replica list from here
     # After clients have been initialized, call setup on respective client
     # nodes
     # This includes sending the configuration file and repective client no

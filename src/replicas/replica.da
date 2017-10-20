@@ -10,7 +10,7 @@ FAILURES_TO_TOLERATE = "t"
 
 class replica(process):    
 
-    def setup(config_file, replica_no, replicas, olympus):
+    def setup(config_file, replica_no, replicas, replicas_name, olympus):
         ## cache for storing result and result proof
         self.cache = {}
         ## current_slot updated only by head replica
