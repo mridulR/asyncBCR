@@ -13,6 +13,7 @@ from random import randint
 NUM_OF_CLIENTS = 'num_client'
 CLIENT_TIMEOUT = 'client_timeout'
 CLIENT_HOSTS = 'client_hosts'
+WORK_LOAD = 'workload'
 
 
 class client(process):
@@ -77,27 +78,36 @@ class client(process):
                      "for CURRENT_CONFIG to olympus {olympusId: %s," +
                      "olympusName: %s} ", self.nodeId, self.name, self.olympus,
                      self.olympus_name, extra=Logger.NODE_INFO)
+        
+        
+        work_load = config_parser.get_config(config_file)[WORK_LOAD + '[' + str(client_no) + ']']
+        client_work_load = [each_workload.strip() for each_workload in work_load.split(';')] 
     
         ##### Needs to be refactored
-        client_work_load = []
-        client_work_load.append("put('movie','star')")
-        client_work_load.append("append('movie',' wars')")
-        client_work_load.append("put('jedi','luke skywalker')")
-        #client_work_load.append("slice('jedi','0:4')")
-        client_work_load.append("get('jedi')")
-        client_work_load.append("get('movie')")
-        
+        #client_work_load = []
+        #client_work_load.append("put('movie','star')")
+        #client_work_load.append("append('movie',' wars')")
+        #client_work_load.append("put('jedi','luke skywalker')")
+        ##client_work_load.append("slice('jedi','0:4')")
+        #client_work_load.append("get('jedi')")
+        #client_work_load.append("get('movie')")
+        print(client_work_load) 
         for order in client_work_load:
-            send(('req_curr_config', self), to=olympus)
-            await(some(received(('rcv_curr_config', _))))
-            if len(current_replicas) > 0:
-                send(('request_order', self, randint(1, 9000), order),
-                        to=current_replicas[0])
-            print("time_out", time_out)
-            if await(len(setof(a, received(('result_proof', _, _), from_ =a))) > 0):
-                print("Result within time bound")
-            elif timeout(int(time_out) / 1000):
-                print("Time out is working")
+            print('order is : ', order)
+            if order.startswith('pseudorandom') or order.startswith('slice'):
+                print('Not executing - ', order)
+                pass
+            else:
+                send(('req_curr_config', self), to=olympus)
+                await(some(received(('rcv_curr_config', _))))
+                if len(current_replicas) > 0:
+                    send(('request_order', self, randint(1, 9000), order),
+                            to=current_replicas[0])
+                print("time_out", time_out)
+                if await(len(setof(a, received(('result_proof', _, _), from_ =a))) > 0):
+                    print("Result within time bound")
+                elif timeout(int(time_out) / 1000):
+                    print("Time out is working")
         while True:
             await(received(('', )))
         return
