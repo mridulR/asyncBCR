@@ -33,28 +33,29 @@ def main():
     else:
         logging.info("No configuration file is passed. Picking default" +
                      ":/config/config.csv", extra=Logger.NODE_INFO)
-
-    config = config_parser.get_config(config_file)
+    
+    config(channel="reliable")
+    config_values = config_parser.get_config(config_file)
     hosts = [each_host.strip() for each_host in
-             config[config_parser.HOSTS].split(';')]
+             config_values[config_parser.HOSTS].split(';')]
 
     # Initialize olympus at respective host.
 
-    olympus_host = hosts[int(config[olympus.HOST])]
+    olympus_host = hosts[int(config_values[olympus.HOST])]
     oly_name = 'OlympusNode'
     if olympus_host != 'localhost':
         oly_name += '@' + olympus_host
     oly = new(olympus.olympus, num=1, at=oly_name)
 
     client_hosts = [int(cl_host) for cl_host in
-                    config[client.CLIENT_HOSTS].split(';')]
+                    config_values[client.CLIENT_HOSTS].split(';')]
 
     # Initialize clients at respective hosts.
     # Number of clients and their hosts is read from config file
 
     client_list = []
     client_name = []
-    for client_no in range(0, int(config[client.NUM_OF_CLIENTS])):
+    for client_no in range(0, int(config_values[client.NUM_OF_CLIENTS])):
         node_name = 'ClientNode' + str(client_no)
 
         # TODO: Right now only supporting localhost.
@@ -68,14 +69,14 @@ def main():
                      client_list[-1], client_name[-1], extra=Logger.NODE_INFO)
 
     replica_hosts = [int(rep_host) for rep_host in
-                     config[replica.REPLICA_HOSTS].split(';')]
+                     config_values[replica.REPLICA_HOSTS].split(';')]
 
     # Initialize replicas at respective hosts.
     # Number of replicas and their hosts is read from config file
 
     replica_list = []
     replica_name = []
-    num_of_replicas = 2 * int(config[replica.FAILURES_TO_TOLERATE]) + 1
+    num_of_replicas = 2 * int(config_values[replica.FAILURES_TO_TOLERATE]) + 1
     for replica_no in range(0, num_of_replicas):
         node_name = 'ReplicaNode' + str(replica_no)
 
@@ -106,7 +107,7 @@ def main():
     # nodes
     # This includes sending the configuration file and repective client no
 
-    for client_no in range(0, int(config[client.NUM_OF_CLIENTS])):
+    for client_no in range(0, int(config_values[client.NUM_OF_CLIENTS])):
         setup(client_list[client_no], [config_file, client_no, oly, oly_name,
             client_name[client_no], client_list[client_no]])
         logging.info("Setting up client- ClientId: %s ClientName: %s",
