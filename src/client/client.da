@@ -54,13 +54,12 @@ class client(process):
             self.current_replicas = replicas
         else:
             print("No replica to send order request to !!!")
-
         return
 
 
     def receive(msg=('result_proof', result_proof, replica_no)):
-        output("Received result_proof from replica ReplicaNode", str(replica_no))
-        output(result_proof)
+        print("Received result_proof from replica ReplicaNode", str(replica_no))
+        print(result_proof)
 
         logging.info("client { clientId: %s, clientName: %s} received " +
                      "result_proof from replica {replicaId: %s, replicaName:" +
@@ -69,7 +68,8 @@ class client(process):
         return
 
     def receive(msg=('retransmission_result', result_proof, replica_no)):
-        print ("Received Retransmission result")
+        print ("Received Retransmission result ", replica_no )
+        print (result_proof)
 
     def generate_psedorandom(seed, num):
         orders = []
@@ -129,22 +129,24 @@ class client(process):
                      "olympusName: %s} ", self.nodeId, self.name, self.olympus,
                      self.olympus_name, extra=Logger.NODE_INFO)
         
-        
-        work_load = config_parser.get_config(config_file)[WORK_LOAD + '[' + str(client_no) + ']']
-        client_work_load = [each_workload.strip() for each_workload in work_load.split(';')] 
+        client_work_load_ind = WORK_LOAD + '[' + str(client_no) + ']'
+        configs = config_parser.get_config(config_file)
+        if client_work_load_ind in configs:
+            work_load = configs[client_work_load_ind]
+            client_work_load = [each_workload.strip() for each_workload in work_load.split(';')] 
     
-        print(client_work_load)
-        for order in client_work_load:
-            print('order is : ', order)
-            if order.startswith('pseudorandom'):
-                seed_num_pair_str = re.search(r'\((.*?)\)',order).group(1)
-                seed_num_pair_arr = seed_num_pair_str.split(',')
-                gen_orders = generate_psedorandom(int(seed_num_pair_arr[0]), int(seed_num_pair_arr[1]))
-                print('Hello', gen_orders)
-                for gen_order in gen_orders:
-                    execute_order(gen_order)
-            else:
-                execute_order(order)
+            print(client_work_load)
+            for order in client_work_load:
+                print('order is : ', order)
+                if order.startswith('pseudorandom'):
+                    seed_num_pair_str = re.search(r'\((.*?)\)',order).group(1)
+                    seed_num_pair_arr = seed_num_pair_str.split(',')
+                    gen_orders = generate_psedorandom(int(seed_num_pair_arr[0]), int(seed_num_pair_arr[1]))
+                    print('Hello', gen_orders)
+                    for gen_order in gen_orders:
+                        execute_order(gen_order)
+                else:
+                    execute_order(order)
         while True:
             await(received(('', )))
         return

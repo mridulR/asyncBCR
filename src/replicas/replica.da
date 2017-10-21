@@ -20,14 +20,8 @@ class replica(process):
         self.current_slot = 0
         ## running state of replica
         self.running_state = {}
-        ## for handling re-transmission have this at head
-        self.orders_received = {} 
         ## history of replica
         self.history = []
-
-        config = config_parser.get_config(config_file)
-        self.head_time_out = config[HEAD_TIMEOUT]
-        self.non_head_time_out = config[NON_HEAD_TIMEOUT]
 
         ## Update next and previous replica by each replica
         self.num_of_replicas = len(replicas)
@@ -43,7 +37,12 @@ class replica(process):
             self.prev = replicas[replica_no - 1]
             self.me = replicas[replica_no]
             self.next_r = replicas[replica_no + 1]
-        
+       
+        ## Setting timeout for replica head and non-head
+        config = config_parser.get_config(config_file)
+        self.head_time_out = config[HEAD_TIMEOUT]
+        self.non_head_time_out = config[NON_HEAD_TIMEOUT]
+ 
         if prev == None:
             self.time_out = head_time_out
         else:
@@ -99,7 +98,6 @@ class replica(process):
             if arg1 in running_state:
                 result = running_state[arg1]
         elif comm == 3:
-            print("hahahah", " arg1 = " + arg1, " arg2 =" + arg2, " arg3 =" + arg3, running_state)
             if arg1 in running_state:
                 curr_val = running_state[arg1]
                 if int(arg2) >= 0 and int(arg3) <= len(curr_val) and int(arg2) <= int(arg3):
@@ -139,38 +137,44 @@ class replica(process):
     def receive(msg=('retransmission_to_head', client, replica, order_id, order,)):
         print('Retrnsmission request forwarded from replica ......')
         if self.prev == None:
-            if order_id in cache:
+            if order_id in cache and len(cache[order_id]) == 2:
                 send(('retransmission_result', cache[order_id], replica_no,), to = client)
-            else:
-                if order_id in orders_received:
-                    if await(order_id in cache):
+                send(('retransmission_ack', order_id), to = replica)
+            elif order_id in cache and len(cache[order_id]) == 1:
+                if await(len(cache[order_id]) == 2):
+                    send(('retransmission_result', cache[order_id], replica_no,), to = client)
+                    send(('retransmission_ack', order_id), to = replica)
+                elif timeout(int(time_out) / 1000):
+                    handle_client_req_at_head(client, order_id, order)
+                    if await(len(cache[order_id]) == 2):
                         send(('retransmission_result', cache[order_id], replica_no,), to = client)
                         send(('retransmission_ack', order_id), to = replica)
                     elif timeout(int(time_out) / 1000):
-                        print("TODO", "Send request again and time out")
+                        print("Request of reconfiguration from head")
         else:
             print('I am not the head to eventually deal with re transmission request')
+
+    def handle_client_req_at_head(client, unique_order_ide, order_req):
+        print("Forwarding order request to next : ", order_req)
+        current_slot += 1
+        ## No need to verify order proof at head
+        order_proof = []
+        ## order proof is a list of tuples (slot, order, replica, [digtal signs of preceding])
+        order_proof.append(create_order_proof(current_slot, order_req))
+        print("*****" + str(order_proof))
+        result = get_result(order_req)
+        if result != None:
+            cache[unique_order_ide] = [result]
+            result_proof = []
+            result_proof.append(get_result_proof(result))
+            send(('forward_shuttle', client, unique_order_ide, \
+                order_proof, result_proof,), to = next_r)    
 
     # Only head is supposed to handle order request from client    
     def receive(msg=('request_order', client, unique_order_ide, order_req,)):
         print("Received order request from " + str(client))
         if self.prev == None:
-            print("Forwarding order request to next : ", order_req)
-            self.current_slot += 1
-            ## No need to verify order proof at head
-            order_proof = []
-            ## order proof is a list of tuples (slot, order, replica, [digtal signs of preceding])
-            order_proof.append(create_order_proof(self.current_slot, order_req))
-            print("*****" + str(order_proof))
-            result = get_result(order_req)
-            if result != None:
-                cache[unique_order_ide] = [result, None] ## None for result proof which will be
-                                                     ## update in return shuttle
-                orders_received[unique_order_ide] = order_req
-                result_proof = []
-                result_proof.append(get_result_proof(result))          
-                send(('forward_shuttle', client, unique_order_ide, \
-                    order_proof, result_proof,), to = self.next_r)
+            handle_client_req_at_head(client, unique_order_ide, order_req)
         else:
             print("I am not the head to take order request from client")
 
@@ -194,8 +198,8 @@ class replica(process):
                 current_slot, order_req = get_slot_order(order_proof)
                 order_proof.append(create_order_proof(current_slot, order_req))
                 result = get_result(order_req)
-                cache[unique_order_ide] = [result]
                 result_proof.append(get_result_proof(result))
+                cache[unique_order_ide] = [result, result_proof]
                 send(('result_proof', (result, result_proof), self.replica_no,), to = client)
                 history.append(order_proof)
                 print("sending result proof shuttle back")
@@ -217,12 +221,14 @@ class replica(process):
     # Re-transmission from client
     def receive(msg=('retransmission', client, order_id, order,)):
         print('Retrnsmission request received...... sending response')
-        if order_id in cache:
+        print("cache ", cache)
+        if order_id in cache and len(cache[order_id]) == 2:
+            print('I have cashed value for order_id ', order_id, " ")
             send(('retransmission_result', cache[order_id], replica_no,), to = client)
         else:
             send(('retransmission_to_head', client, self, \
                 order_id, order,), to = replicas[0])
-            if await(received(('retransmission_ack', _order_id,))):
+            if await(received(('retransmission_ack', "=order_id",))):
                 print("Ack from head received, do nothing")
             elif timeout(int(time_out) / 1000):
                 print("Reconfiguration request raised by ", self)
