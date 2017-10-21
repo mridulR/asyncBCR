@@ -89,8 +89,8 @@ class client(process):
                 orders.append(rand_oper + '(' + rand_key + ',' + append_value + ')')
             elif rand_index == 3:
                 expected_len = len(rand_value)
-                slice_start = 1
-                slice_end = expected_len - 2
+                slice_start = random.randint(0, expected_len)
+                slice_end = random.randint(0, expected_len)
                 orders.append(rand_oper + '(' + rand_key + ',' \
                     + str(slice_start) + ':' + str(slice_end) + ')')
         return orders
