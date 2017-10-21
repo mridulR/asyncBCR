@@ -4,9 +4,12 @@ import os
 import logging
 import time
 import re
+from src.utils import config_parser
 
 REPLICA_HOSTS = "replica_hosts"
 FAILURES_TO_TOLERATE = "t"
+HEAD_TIMEOUT = "head_timeout"
+NON_HEAD_TIMEOUT = "nonhead_timeout"
 
 class replica(process):    
 
@@ -17,8 +20,14 @@ class replica(process):
         self.current_slot = 0
         ## running state of replica
         self.running_state = {}
+        ## for handling re-transmission have this at head
+        self.orders_received = {} 
         ## history of replica
         self.history = []
+
+        config = config_parser.get_config(config_file)
+        self.head_time_out = config[HEAD_TIMEOUT]
+        self.non_head_time_out = config[NON_HEAD_TIMEOUT]
 
         ## Update next and previous replica by each replica
         self.num_of_replicas = len(replicas)
@@ -34,6 +43,11 @@ class replica(process):
             self.prev = replicas[replica_no - 1]
             self.me = replicas[replica_no]
             self.next_r = replicas[replica_no + 1]
+        
+        if prev == None:
+            self.time_out = head_time_out
+        else:
+            self.time_out = non_head_time_out
 
     def create_order_proof(slot_no, order_string):
         ## TODO: Add digital signature as the last column
@@ -115,6 +129,26 @@ class replica(process):
     def get_slot_order(order_proof):
         first_order_st = order_proof[0]
         return first_order_st[0], first_order_st[1]
+    
+    # Retransmission ack from head to replica
+    def receive(msg=('retransmission_ack', order_id), from_ =replicas[0]):
+        print('Received ack from head for retransmission, cancelling timeout')
+
+    # Eventually head will deal with re-transmission from replicas
+    def receive(msg=('retransmission_to_head', client, replica, order_id, order,)):
+        print('Retrnsmission request forwarded from replica ......')
+        if self.prev == None:
+            if order_id in cache:
+                send(('retransmission_result', cache[order_id], replica_no,), to = client)
+            else:
+                if order_id in orders_received:
+                    if await(order_id in cache):
+                        send(('retransmission_result', cache[order_id], replica_no,), to = client)
+                        send(('retransmission_ack', order_id), to = replica)
+                    elif timeout(int(time_out) / 1000):
+                        print("TODO", "Send request again and time out")
+        else:
+            print('I am not the head to eventually deal with re transmission request')
 
     # Only head is supposed to handle order request from client    
     def receive(msg=('request_order', client, unique_order_ide, order_req,)):
@@ -131,6 +165,7 @@ class replica(process):
             if result != None:
                 cache[unique_order_ide] = [result, None] ## None for result proof which will be
                                                      ## update in return shuttle
+                orders_received[unique_order_ide] = order_req
                 result_proof = []
                 result_proof.append(get_result_proof(result))          
                 send(('forward_shuttle', client, unique_order_ide, \
@@ -177,7 +212,20 @@ class replica(process):
         else:
             print("I am the Head and have received result proof shuttle")
             print(result_proof)
-    
+
+    # Re-transmission from client
+    def receive(msg=('retransmission', client, order_id, order,)):
+        print('Retrnsmission request received...... sending response')
+        if order_id in cache:
+            send(('retransmission_result', cache[order_id], replica_no,), to = client)
+        else:
+            send(('retransmission_to_head', client, self, \
+                order_id, order,), to = replicas[0])
+            if await(received(('retransmission_ack', _order_id,))):
+                print("Ack from head received, do nothing")
+            elif timeout(int(time_out) / 1000):
+                print("Reconfiguration request raised by ", self)
+
     def run():
         print("Replica : ", str(self.me))
         while True:

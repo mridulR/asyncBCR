@@ -60,13 +60,15 @@ class client(process):
         output("Received result_proof from replica ReplicaNode", str(replica_no))
         output(result_proof)
 
-        # TODO: Based on above todo fix this as well
-
         logging.info("client { clientId: %s, clientName: %s} received " +
                      "result_proof from replica {replicaId: %s, replicaName:" +
                      "%s}", self.nodeId, self.name, str(replica_no),
                      str(replica_no), extra=Logger.NODE_INFO)
         return
+
+    def receive(msg=('retransmission_result', result_proof, replica_no)):
+        print ("Received Retransmission result")
+
 
     def run():
 
@@ -83,15 +85,7 @@ class client(process):
         work_load = config_parser.get_config(config_file)[WORK_LOAD + '[' + str(client_no) + ']']
         client_work_load = [each_workload.strip() for each_workload in work_load.split(';')] 
     
-        ##### Needs to be refactored
-        #client_work_load = []
-        #client_work_load.append("put('movie','star')")
-        #client_work_load.append("append('movie',' wars')")
-        #client_work_load.append("put('jedi','luke skywalker')")
-        ##client_work_load.append("slice('jedi','0:4')")
-        #client_work_load.append("get('jedi')")
-        #client_work_load.append("get('movie')")
-        print(client_work_load) 
+        print(client_work_load)
         for order in client_work_load:
             print('order is : ', order)
             if order.startswith('pseudorandom') or order.startswith('slice'):
@@ -100,14 +94,25 @@ class client(process):
             else:
                 send(('req_curr_config', self), to=olympus)
                 await(some(received(('rcv_curr_config', _))))
+                request_id = randint(1, 9000)
                 if len(current_replicas) > 0:
-                    send(('request_order', self, randint(1, 9000), order),
+                    send(('request_order', self, request_id, order),
                             to=current_replicas[0])
-                print("time_out", time_out)
                 if await(len(setof(a, received(('result_proof', _, _), from_ =a))) > 0):
                     print("Result within time bound")
+                    print("Replicas : ", str(current_replicas))
                 elif timeout(int(time_out) / 1000):
-                    print("Time out is working")
+                    retransmission_flag = True
+                    while retransmission_flag:
+                        send(('req_curr_config', self), to=olympus)
+                        await(some(received(('rcv_curr_config', _))))
+                        for rep in current_replicas:
+                            print('sending retransmission to : ', str(rep))
+                            send(('retransmission', self, request_id, order), to=rep)
+                        if await(len(setof(a, received(('retransmission_result', _, _), from_ =a))) > 0):
+                            retransmission_flag = False
+                        elif timeout(int(time_out) / 1000):
+                            continue
         while True:
             await(received(('', )))
         return
