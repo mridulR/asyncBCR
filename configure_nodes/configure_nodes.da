@@ -19,7 +19,7 @@ def main():
 
     # Read configuration
 
-    config_file = 'config/config.csv'
+    config_file = 'config/single_client_with_no_failure_with_workload.csv'
 
     # Setting the logging format for the CONFIG_NODE
     # Default logging is INFO for CONFIG_NODE.
@@ -32,7 +32,7 @@ def main():
         config_file = sys.argv[1]
     else:
         logging.info("No configuration file is passed. Picking default" +
-                     ":/config/config.csv", extra=Logger.NODE_INFO)
+                     ":/config/single_client_with_no_failure_with_workload.csv", extra=Logger.NODE_INFO)
     
     config(channel="reliable")
     config_values = config_parser.get_config(config_file)
