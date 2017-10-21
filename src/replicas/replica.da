@@ -73,8 +73,8 @@ class replica(process):
             arg1_pair = [each for each in all_arg.split(',')]
             arg1 = arg1_pair[0]
             arg2_3 = [each for each in arg1_pair[1].split(':')]
-            arg2 = arg2_3[0]
-            arg3 = arg2_3[1]
+            arg2 = arg2_3[0].replace("'", "")
+            arg3 = arg2_3[1].replace("'", "")
         elif order_string.startswith('append'):
             comm = 4
             both_arg  = re.search(r'\((.*?)\)',order_string).group(1)
@@ -99,6 +99,7 @@ class replica(process):
             if arg1 in running_state:
                 result = running_state[arg1]
         elif comm == 3:
+            print("hahahah", " arg1 = " + arg1, " arg2 =" + arg2, " arg3 =" + arg3, running_state)
             if arg1 in running_state:
                 curr_val = running_state[arg1]
                 if int(arg2) >= 0 and int(arg3) <= len(curr_val) and int(arg2) <= int(arg3):
