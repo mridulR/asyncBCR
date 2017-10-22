@@ -6,6 +6,7 @@ import logging
 import time
 from src.utils import Logger
 from src.utils import config_parser
+from src.utils import command_executor
 from random import randint
 import re
 import random
@@ -16,6 +17,8 @@ NUM_OF_CLIENTS = 'num_client'
 CLIENT_TIMEOUT = 'client_timeout'
 CLIENT_HOSTS = 'client_hosts'
 WORK_LOAD = 'workload'
+VER_STRATEGY = 'verification_strategy'
+VER_MODE = ['VERIFY_EACH_VALUE']
 
 
 class client(process):
@@ -23,9 +26,14 @@ class client(process):
     def setup(config_file, client_no, olympus, olympus_name,
               name, nodeId,):
 
-        config = config_parser.get_config(config_file)
+        self.config = config_parser.get_config(config_file)
         self.time_out = config[CLIENT_TIMEOUT]
-
+        
+        # For verifying result value at client.
+        # client behaves as tester
+        self.running_state = {}
+        self.result_map = {}
+        
         self.current_replicas = []
         # Setting the logging format for the CONFIG_NODE
         # Default logging is INFO for CONFIG_NODE.
@@ -47,24 +55,33 @@ class client(process):
                      self.olympus, self.olympus_name,
                      extra=Logger.NODE_INFO)
         return
-        
+
+    def verify_result(result, request_id):
+        if VER_MODE[0] == config[VER_STRATEGY]:
+            if result == result_map[request_id]:
+                print("Passed")
+            else:
+                print("Failed")
+
+
     def receive(msg=('rcv_curr_config', replicas), from_=self.olympus):
         if int(len(replicas)) > 0:
-            print("Setting current replicas set message to head : ")
             self.current_replicas = replicas
         else:
             print("No replica to send order request to !!!")
         return
 
 
-    def receive(msg=('result_proof', result_proof, replica_no)):
-        print("Received result_proof from replica ReplicaNode", str(replica_no))
-        print(result_proof)
+    def receive(msg=('result_proof', result_proof, replica_no, request_id)):
 
         logging.info("client { clientId: %s, clientName: %s} received " +
                      "result_proof from replica {replicaId: %s, replicaName:" +
                      "%s}", self.nodeId, self.name, str(replica_no),
                      str(replica_no), extra=Logger.NODE_INFO)
+        #verify_result_proof(result_proof) ---- > Part of algorithm
+        
+        # Client acting as tester
+        verify_result(result_proof[0], request_id)
         return
 
     def receive(msg=('retransmission_result', result_proof, replica_no)):
@@ -95,15 +112,12 @@ class client(process):
                     + str(slice_start) + ':' + str(slice_end) + ')')
         return orders
 
-    def execute_order(order):
-        send(('req_curr_config', self), to=olympus)
-        await(some(received(('rcv_curr_config', _))))
-        request_id = randint(1, 9000)
+    def execute_order(order, request_id):
         if len(current_replicas) > 0:
             send(('request_order', self, request_id, order), \
                 to=current_replicas[0])
-            if await(len(setof(a, received(('result_proof', _, _), from_ =a))) > 0):
-                print("Result within time bound")
+            if await(len(setof(a, received(('result_proof', _, _, _), from_ =a))) > 0):
+                pass
             elif timeout(int(time_out) / 1000):
                 retransmission_flag = True
                 while retransmission_flag:
@@ -123,30 +137,34 @@ class client(process):
         logging.info("Running client- clientId: %s clientName: %s",
                      self.nodeId, self.name, extra=Logger.NODE_INFO)
 
-        print("Asking current config from olympus")
         logging.info("Client {clientId: %s, clientName: %s} sending request " +
                      "for CURRENT_CONFIG to olympus {olympusId: %s," +
                      "olympusName: %s} ", self.nodeId, self.name, self.olympus,
                      self.olympus_name, extra=Logger.NODE_INFO)
+
+        send(('req_curr_config', self), to=olympus)
+        await(some(received(('rcv_curr_config', _))))
         
         client_work_load_ind = WORK_LOAD + '[' + str(client_no) + ']'
-        configs = config_parser.get_config(config_file)
-        if client_work_load_ind in configs:
-            work_load = configs[client_work_load_ind]
+        if client_work_load_ind in config:
+            work_load = config[client_work_load_ind]
             client_work_load = [each_workload.strip() for each_workload in work_load.split(';')] 
     
-            print(client_work_load)
             for order in client_work_load:
-                print('order is : ', order)
                 if order.startswith('pseudorandom'):
                     seed_num_pair_str = re.search(r'\((.*?)\)',order).group(1)
                     seed_num_pair_arr = seed_num_pair_str.split(',')
                     gen_orders = generate_psedorandom(int(seed_num_pair_arr[0]), int(seed_num_pair_arr[1]))
-                    print('Hello', gen_orders)
                     for gen_order in gen_orders:
-                        execute_order(gen_order)
+                        print(gen_order)
+                        request_id = randint(1, 9000)
+                        result_map[request_id] = command_executor.get_result(gen_order, running_state) 
+                        execute_order(gen_order, request_id)
                 else:
-                    execute_order(order)
+                    print(order)
+                    request_id = randint(1, 9000)
+                    result_map[request_id] = command_executor.get_result(order, running_state)
+                    execute_order(order, request_id)
         while True:
             await(received(('', )))
         return

@@ -136,7 +136,7 @@ class replica(process):
                 result = command_executor.get_result(order_req, running_state)
                 result_proof.append(get_result_proof(result))
                 cache[unique_order_ide] = [result, result_proof]
-                send(('result_proof', (result, result_proof), self.replica_no,), to = client)
+                send(('result_proof', (result, result_proof), self.replica_no, unique_order_ide), to = client)
                 history.append(order_proof)
                 print("sending result proof shuttle back")
                 send(('result_shuttle', unique_order_ide, result_proof,), to = self.prev)
