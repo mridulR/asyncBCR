@@ -7,27 +7,23 @@ def parse_order_string(order_string):
     arg3 = None
     if order_string.startswith('put'):
         comm = 1
-        both_arg  = re.search(r'\((.*?)\)',order_string).group(1)
-        arguments = [each for each in both_arg.split(',')]
-        arg1 = arguments[0].replace("'", "")
-        arg2 = arguments[1].replace("'", "")
+        both_arg  = re.search(r'\((.*?),(.*?)\)',order_string)
+        arg1 = both_arg.group(1).replace("'", "")
+        arg2 = both_arg.group(2).replace("'", "")
     elif order_string.startswith('get'):
         comm = 2
         arg1 = re.search(r'\((.*?)\)',order_string).group(1).replace("'", "")
     elif order_string.startswith('slice'):
         comm = 3
-        all_arg = re.search(r'\((.*?)\)',order_string).group(1)
-        arg1_pair = [each for each in all_arg.split(',')]
-        arg1 = arg1_pair[0].replace("'", "")
-        arg2_3 = [each for each in arg1_pair[1].split(':')]
-        arg2 = arg2_3[0].replace("'", "")
-        arg3 = arg2_3[1].replace("'", "")
+        all_arg = re.search(r'\((.*?),(.*?):(.*?)\)',order_string)
+        arg1 = all_arg.group(1).replace("'", "")
+        arg2 = all_arg.group(2).replace("'", "")
+        arg3 = all_arg.group(3).replace("'", "")
     elif order_string.startswith('append'):
         comm = 4
-        both_arg  = re.search(r'\((.*?)\)',order_string).group(1)
-        arguments = [each for each in both_arg.split(',')]
-        arg1 = arguments[0].replace("'", "")
-        arg2 = arguments[1].replace("'", "")
+        both_arg  = re.search(r'\((.*?),(.*?)\)',order_string)
+        arg1 = both_arg.group(1).replace("'", "")
+        arg2 = both_arg(2).replace("'", "")
     return comm, arg1, arg2, arg3
 
 
