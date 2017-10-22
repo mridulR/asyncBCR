@@ -17,13 +17,19 @@ HEAD_TIMEOUT = "head_timeout"
 NON_HEAD_TIMEOUT = "nonhead_timeout"
 HASHER = nacl.hash.sha256
 
-class replica(process):    
+class replica(process):
+
 
     def setup(config_file, replica_no, replicas, replicas_name, olympus, \
         oly_verify_key, replica_verify_keys, sign_key):
         ## cache for storing result and result proof
 
         self.cache = {}
+        
+        self.client_direct_msg_trigger = {}
+        self.client_fwd_rqst_trigger = {}
+        self.client_shuttle_trigger = {}
+        self.client_result_shuttle_trigger = {}
 
         ## current_slot updated only by head replica
 
@@ -36,6 +42,7 @@ class replica(process):
         ## history of replica
 
         self.history = []
+
 
         ## Update next and previous replica by each replica
 
@@ -96,7 +103,7 @@ class replica(process):
 
        
         ## Setting timeout for replica head and non-head
-        config = config_parser.get_config(config_file)
+        self.config = config_parser.get_config(config_file)
         self.head_time_out = config[HEAD_TIMEOUT]
         self.non_head_time_out = config[NON_HEAD_TIMEOUT]
  
@@ -109,6 +116,35 @@ class replica(process):
             logging.info("Replica timeout - %s", str(non_head_time_out),
                          extra=logger.NODE_INFO)
         return
+
+    def set_failure_triggers():
+        for key,value in config.items():
+            trigger_failure_list = []
+            if key.startswith('failures'):
+                config_replica = re.search(r'\[(.*?),(.*?)\]', key)
+                config = int(config_replica.group(1))
+                replica = int(config_replica.group(2))
+                ### In phase 1 only concerned with config 0
+                if config == 0 and replica == replica_no:
+                    trigger_failures = [each.strip() for each in value.split(';')]
+                    for trigg_fail in trigger_failures:
+                        if trigg_fail.startswith("client_request"):
+                            cli_msg = re.search(r'client_request\((.*?),(.*?)\),(.*?)\(\)', trigg_fail)
+                            key = cli_msg.group(1) + "_" + cli_msg.group(2)
+                            client_direct_msg_trigger[key] = cli_msg.group(3).strip()
+                        elif trigg_fail.startswith("forwarded_request"):
+                            cli_msg = re.search(r'forwarded_request\((.*?),(.*?)\),(.*?)\(\)', trigg_fail)
+                            key = cli_msg.group(1) + "_" + cli_msg.group(2)
+                            client_fwd_rqst_trigger[key] = cli_msg.group(3).strip()
+                        elif trigg_fail.startswith("shuttle"):
+                            cli_msg = re.search(r'shuttle\((.*?),(.*?)\),(.*?)\(\)', trigg_fail)
+                            key = cli_msg.group(1) + "_" + cli_msg.group(2)
+                            client_shuttle_trigger[key] = cli_msg.group(3).strip()
+                        elif trigg_fail.startswith("result_shuttle"):
+                            cli_msg = re.search(r'result_shuttle\((.*?),(.*?)\),(.*?)\(\)', trigg_fail)
+                            key = cli_msg.group(1) + "_" + cli_msg.group(2)
+                            client_result_shuttle_trigger[key] = cli_msg.group(3).strip()
+                                                    
     
     def combine_order_proof(slot_no, order_string, predecessor_orders):
         tup = (str(slot_no), order_string, str(replica_no))
@@ -212,7 +248,6 @@ class replica(process):
 
     # Only head is supposed to handle order request from client    
     def receive(msg=('request_order', client, unique_order_ide, order_req,)):
-        print("Received order request from " + str(client))
         if self.prev == None:
             handle_client_req_at_head(client, unique_order_ide, order_req)
         else:
@@ -222,7 +257,6 @@ class replica(process):
     def receive(msg=('forward_shuttle', client, unique_order_ide, \
          order_proofs, result_proofs, ), from_ = self.prev):
         if self.next_r != None:
-            print("Forwarding order request to next : ", order_proofs)
             if is_valid_order_proofs(order_proofs):
                 current_slot, order_req = get_slot_order(order_proofs)
                 predecessor_order_proof = order_proofs[replica_no - 1][3]
@@ -257,7 +291,6 @@ class replica(process):
             send(('result_shuttle', unique_order_ide, result_proof,), to = self.prev)
         else:
             print("I am the Head and have received result proof shuttle")
-            print(result_proof)
 
     # Re-transmission from client
     def receive(msg=('retransmission', client, order_id, order,)):
@@ -276,6 +309,8 @@ class replica(process):
 
     def run():
         print("Replica : ", str(self.me))
+        set_failure_triggers()
+        print("Failure Triggers - ", client_direct_msg_trigger)        
         while True:
             await(received(('',)))
 

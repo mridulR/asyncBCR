@@ -24,7 +24,7 @@ def main():
     # Read configuration
 
     config_file = 'config/single_client_with_no_failure_with_workload.csv'
-    
+
     # Cleanup the previous run log file for Config
 
     logger.cleanLogFile('Config.log', logger.getLogDir())

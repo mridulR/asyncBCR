@@ -126,7 +126,7 @@ class client(process):
             elif rand_index == 1:
                 orders.append(rand_oper + "(" + rand_key + ")")
             elif rand_index == 2:
-                append_value = "append_rand" + str(random.randint(seed, seed + num))
+                append_value = "some_rand" + str(random.randint(seed, seed + num))
                 orders.append(rand_oper + "(" + rand_key + "," + append_value + ")")
             elif rand_index == 3:
                 expected_len = len(rand_value)

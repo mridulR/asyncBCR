@@ -23,7 +23,7 @@ def parse_order_string(order_string):
         comm = 4
         both_arg  = re.search(r'\((.*?),(.*?)\)',order_string)
         arg1 = both_arg.group(1).replace("'", "")
-        arg2 = both_arg(2).replace("'", "")
+        arg2 = both_arg.group(2).replace("'", "")
     return comm, arg1, arg2, arg3
 
 
