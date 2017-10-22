@@ -452,6 +452,17 @@ class replica(process):
         else:
             print("I am the Head and have received result proof shuttle")
 
+    def trigger_failure_injection_for_cl_dr_msg(client_no, msg_count_by_client):
+        key = str(client_no) + "_" + str(msg_count_by_client)
+        if str(key) in client_direct_msg_trigger:
+            val = client_direct_msg_trigger[key]
+            if val == "change_operation":
+                set_trigger_for_change_operation(client_no, msg_count_by_client, replica_no)
+            elif val == "change_result":
+                set_trigger_for_change_result(client_no, msg_count_by_client, replica_no)
+            elif val == "drop_result_stmt":
+                set_trigger_for_drop_result_stmt(client_no, msg_count_by_client, replica_no)
+
 
     # Re-transmission from client
     def receive(msg=('retransmission', client, client_no, order_id, order,)):
@@ -460,17 +471,28 @@ class replica(process):
         client_direct_msg_counter[client_no] += 1
         print('Retrnsmission request received...... sending response')
         print("cache ", cache)
+        set_global_operation(order)
+        trigger_failure_injection_for_shuttle(client_no, client_direct_msg_counter[client_no]) 
+        order_req = get_injected_operation(client_no, client_direct_msg_counter[client_no], replica_no)
         if order_id in cache and len(cache[order_id]) == 2:
             print('I have cashed value for order_id ', order_id, " ")
-            send(('retransmission_result', cache[order_id], replica_no,), to = client)
+            result = cache[order_id][0]
+            result_proofs = cache[order_id][1]
+            injected_result = get_injected_result(client_no, \
+                client_direct_msg_counter[client_no], replica_no)
+            if injected_result != None:
+                result = "OK"
+            if get_injected_drop_stmt(client_no, client_direct_msg_counter[client_no], replica_no):
+                result_proofs = result_proofs[1][1:]
+            result_proof_pair = (result, result_proofs) 
+            send(('retransmission_result', result_proof_pair, replica_no,), to = client)
         else:
             send(('retransmission_to_head', client, client_no,  self, \
-                order_id, order,), to = replicas[0])
+                order_id, order_req,), to = replicas[0])
             if await(received(('retransmission_ack', "=order_id",))):
                 print("Ack from head received, do nothing")
             elif timeout(int(time_out) / 1000):
                 print("Reconfiguration request raised by ", self)
-
 
     def run():
         print("Replica : ", str(self.me))
