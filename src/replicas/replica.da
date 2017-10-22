@@ -132,9 +132,17 @@ class replica(process):
     def is_valid_order_proofs(order_proofs):
         if len(order_proofs) < 1:
             return False
+        slot = order_proofs[0][0]
+        order = order_proofs[0][1]
+        if slot in cache:
+            return False
         for ind in range(0, replica_no):
+            order_proof = order_proofs[ind]
+            pred_slot = order_proof[0]
+            pred_order = order_proof[1]
+            if slot != pred_slot or order != pred_order:
+                return False
             for sec in range(0, ind + 1):
-                order_proof = order_proofs[ind]
                 verify_key = replica_verify_keys[sec]
                 try:
                     verify_key.verify(order_proof[3][sec])
