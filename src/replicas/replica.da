@@ -35,6 +35,10 @@ class replica(process):
         self.client_fwd_rqst_counter = {}
         self.client_shuttle_counter = {}
         self.client_result_shuttle_counter = {}
+        
+        #Testing
+        self.global_operation = ""
+        self.injected_get_operation = {}
 
         ## current_slot updated only by head replica
 
@@ -261,13 +265,36 @@ class replica(process):
             send(('forward_shuttle', client, client_no, unique_order_ide, \
                 order_proofs, result_proof,), to = next_r)    
 
+    def set_global_operation(order):
+        global_operation = order
+
+    def get_injected_operation(client_no, msg_count, replica_no):
+        key = str(client_no) + "_" + str(replica_no)
+        if key in injected_get_operation.keys():
+            val = injected_get_operation[key]
+            if int(val) < int(msg_count):
+                return "get('x')"
+        return global_operation 
+    
+    def set_trigger_by_shuttle(client_no, msg_num, replica_no):
+        key = str(client_no) + "_" + str(replica_no)
+        injected_get_operation[key] = msg_num
+
+
     # Only head is supposed to handle order request from client    
     def receive(msg=('request_order', client, client_no, unique_order_ide, order_req,)):
         if self.prev == None:
             if client_no not in client_shuttle_counter:
                 client_shuttle_counter[client_no] = 0
             client_shuttle_counter[client_no] += 1
-            handle_client_req_at_head(client, client_no, unique_order_ide, order_req)
+            set_global_operation(order_req)
+            key = str(client_no) + "_" + str(client_shuttle_counter[client_no])
+            if str(key) in client_shuttle_trigger:
+                val = client_shuttle_trigger[key]
+                if val == "change_operation":
+                    set_trigger_by_shuttle(client_no, client_shuttle_counter[client_no], replica_no)
+            order = get_injected_operation(client_no, client_shuttle_counter[client_no], replica_no)        
+            handle_client_req_at_head(client, client_no, unique_order_ide, order)
         else:
             print("I am not the head to take order request from client")
 
