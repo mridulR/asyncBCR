@@ -12,7 +12,6 @@ def getLogDir():
         os.makedirs(logDir)
     return logDir 
 
-
 def setLogNodeInfo(nodeId, nodeName):
     NODE_INFO['NodeId'] = nodeId
     NODE_INFO['NodeName'] = nodeName
@@ -23,4 +22,11 @@ def setLogFormatting(fname, logDir, logLevel):
                    filemode='a',
                    level= logLevel,
                    datefmt='%Y-%m-%d %H:%M:%S')
+    return
 
+def cleanLogFile(fname, logDir):
+    name = logDir + fname
+    print("CleanLogFile ------ ", name)
+    if os.path.isfile(name):
+        with open(name, 'w'): pass    
+    return

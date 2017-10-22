@@ -1,4 +1,4 @@
-from src.utils import Logger 
+from src.utils import logger 
 import sys
 import os
 import logging
