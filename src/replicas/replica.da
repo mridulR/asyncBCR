@@ -39,6 +39,8 @@ class replica(process):
         #Testing
         self.global_operation = ""
         self.injected_get_operation = {}
+        self.injected_change_result = {}
+        self.injected_drop_result = {}
 
         ## current_slot updated only by head replica
 
@@ -133,7 +135,7 @@ class replica(process):
                 config_replica = re.search(r'\[(.*?),(.*?)\]', key)
                 config = int(config_replica.group(1))
                 replica = int(config_replica.group(2))
-                ### In phase 1 only concerned with config 0
+                ### In phase 2 only concerned with config 0
                 if config == 0 and replica == replica_no:
                     trigger_failures = [each.strip() for each in value.split(';')]
                     for trigg_fail in trigger_failures:
@@ -287,17 +289,52 @@ class replica(process):
     def set_global_operation(order):
         global_operation = order
 
+    def get_injected_drop_stmt(client_no, msg_count, replica_no):
+        key = str(client_no) + "_" + str(replica_no)
+        if key in injected_drop_result.keys():
+            val = injected_drop_result[key]
+            if int(val) + 1 == int(msg_count):
+                return True
+        return False
+
+    def get_injected_result(client_no, msg_count, replica_no):
+        key = str(client_no) + "_" + str(replica_no)
+        if key in injected_change_result.keys():
+            val = injected_change_result[key]
+            if int(val) + 1 == int(msg_count):
+                return "OK"
+        return None
+
     def get_injected_operation(client_no, msg_count, replica_no):
         key = str(client_no) + "_" + str(replica_no)
         if key in injected_get_operation.keys():
             val = injected_get_operation[key]
-            if int(val) < int(msg_count):
+            if int(val) + 1 == int(msg_count):
                 return "get('x')"
         return global_operation 
     
-    def set_trigger_by_shuttle(client_no, msg_num, replica_no):
+    def set_trigger_for_change_operation(client_no, msg_num, replica_no):
         key = str(client_no) + "_" + str(replica_no)
         injected_get_operation[key] = msg_num
+
+    def set_trigger_for_change_result(client_no, msg_num, replica_no):
+        key = str(client_no) + "_" + str(replica_no)
+        injected_change_result[key] = msg_num
+
+    def set_trigger_for_drop_resut_stmt(client_no, msg_num, replica_no):
+        key = str(client_no) + "_" + str(replica_no)
+        injected_drop_result[key] = msg_num
+
+    def trigger_failure_injection_for_shuttle(client_no, msg_count_by_client):
+        key = str(client_no) + "_" + str(msg_count_by_client)
+        if str(key) in client_shuttle_trigger:
+            val = client_shuttle_trigger[key]
+            if val == "change_operation":
+                set_trigger_for_change_operation(client_no, msg_count_by_client, replica_no)
+            elif val == "change_result":
+                set_trigger_for_change_result(client_no, msg_count_by_client, replica_no)
+            elif val == "drop_result_stmt":
+                set_trigger_for_drop_result_stmt(client_no, msg_count_by_client, replica_no)
 
 
     # Only head is supposed to handle order request from client    
@@ -306,13 +343,11 @@ class replica(process):
             if client_no not in client_shuttle_counter:
                 client_shuttle_counter[client_no] = 0
             client_shuttle_counter[client_no] += 1
+            ## Injected code ---- Start   
             set_global_operation(order_req)
-            key = str(client_no) + "_" + str(client_shuttle_counter[client_no])
-            if str(key) in client_shuttle_trigger:
-                val = client_shuttle_trigger[key]
-                if val == "change_operation":
-                    set_trigger_by_shuttle(client_no, client_shuttle_counter[client_no], replica_no)
-            order = get_injected_operation(client_no, client_shuttle_counter[client_no], replica_no)        
+            trigger_failure_injection_for_shuttle(client_no, client_shuttle_counter[client_no])
+            order = get_injected_operation(client_no, client_shuttle_counter[client_no], replica_no)
+            ## Injected code -----End        
             handle_client_req_at_head(client, client_no, unique_order_ide, order)
         else:
             print("I am not the head to take order request from client")
@@ -321,18 +356,32 @@ class replica(process):
     # Forward Shuttle to next
     def receive(msg=('forward_shuttle', client, client_no, unique_order_ide, \
          order_proofs, result_proofs, ), from_ = self.prev):
-        if client_no not in client_fwd_rqst_counter:
-            client_fwd_rqst_counter[client_no] = 0
-        client_fwd_rqst_counter[client_no] += 1
+        if client_no not in client_shuttle_counter:
+            client_shuttle_counter[client_no] = 0
+            client_shuttle_counter[client_no] += 1
         if self.next_r != None:
             if is_valid_order_proofs(order_proofs):
                 current_slot, order_req = get_slot_order(order_proofs)
+                ## Injected code ----- Start
+                set_global_operation(order_req)
+                trigger_failure_injection_for_shuttle(client_no, client_shuttle_counter[client_no])
+                order_req = get_injected_operation(client_no, client_shuttle_counter[client_no], replica_no)
+                ## Injected code ----- End
                 predecessor_order_proof = order_proofs[replica_no - 1][3]
                 order_proofs.append(combine_order_proof(current_slot, order_req, predecessor_order_proof))
                 result = command_executor.get_result(order_req, running_state)
+                ## Injected code ----- Start
+                injected_result = get_injected_result(client_no, client_shuttle_counter[client_no], replica_no)
+                if injected_result != None:
+                    result = injected_result
+                ## Injected code ----- End
                 cache[unique_order_ide] = [result]
                 predecessor_results = result_proofs[replica_no - 1][2]
-                result_proofs.append(combine_result_proof(result, order_req, predecessor_results)) 
+                result_proofs.append(combine_result_proof(result, order_req, predecessor_results))
+                ## Injected code ----- Start
+                if get_injected_drop_stmt(client_no, client_shuttle_counter[client_no], replica_no):
+                    result_proofs = result_proofs[1:]
+                ## Injected code ----- End
                 send(('forward_shuttle', client, client_no, unique_order_ide, \
                      order_proofs, result_proofs,), to = self.next_r)
             ## else make reconfiguration call to olympus
@@ -340,19 +389,30 @@ class replica(process):
             print("I am the tail and sending to client")
             if is_valid_order_proofs(order_proofs):
                 current_slot, order_req = get_slot_order(order_proofs)
-                ##order_proofs.append(create_order_proof(current_slot, order_req))
+                # Injected code ------ Start
+                set_global_operation(order_req)
+                trigger_failure_injection_for_shuttle(client_no, client_shuttle_counter[client_no])
+                order_req = get_injected_operation(client_no, client_shuttle_counter[client_no], replica_no)
                 result = command_executor.get_result(order_req, running_state)
+                injected_result = get_injected_result(client_no, client_shuttle_counter[client_no], replica_no)
+                if injected_result != None:
+                    result = injected_result
+                # Injected code ------ End
                 predecessor_results = result_proofs[replica_no - 1][2]
                 result_proofs.append(combine_result_proof(result, order_req, predecessor_results))
                 if is_valid_result_proof(result_proofs):
                     cache[unique_order_ide] = [result, result_proofs]
+                    ## Injection code ----- Start
+                    if get_injected_drop_stmt(client_no, client_shuttle_counter[client_no], replica_no):
+                        result_proofs = result_proofs[1:]
+                    ## Injected code ------ End
                     send(('result_proof', (result, result_proofs), self.replica_no, unique_order_ide), to = client)
                     history.append(order_proofs)
                     print("sending result proof shuttle back")
                     send(('result_shuttle', unique_order_ide, client_no, result_proofs,), to = self.prev)
                 else:
                     print("Result proof error so raise reconfiguration")
-
+    
     
     # Return Shuttle from next
     def receive(msg=('result_shuttle', unique_order_ide, client_no, result_proof,), from_ = self.next_r):
