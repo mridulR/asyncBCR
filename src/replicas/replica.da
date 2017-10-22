@@ -15,29 +15,80 @@ NON_HEAD_TIMEOUT = "nonhead_timeout"
 class replica(process):    
 
     def setup(config_file, replica_no, replicas, replicas_name, olympus):
+
         ## cache for storing result and result proof
+
         self.cache = {}
+
         ## current_slot updated only by head replica
+
         self.current_slot = 0
+
         ## running state of replica
+
         self.running_state = {}
+
         ## history of replica
+
         self.history = []
 
         ## Update next and previous replica by each replica
+
         self.num_of_replicas = len(replicas)
         if replica_no == 0:
             self.prev = None
             self.me = replicas[0]
             self.next_r = replicas[1]
+            
+            # Setting log file for head Node
+
+            logger.setLogFormatting(replicas_name[replica_no] + '.log', logger.getLogDir(),
+                                    logging.INFO)
+            logger.setLogNodeInfo(self, replicas_name[replica_no])
+
+            # Log the received values
+
+            logging.info("HEAD received setup - config_file: %s replica_list: " +
+                         "%s replica_name: %s olympus: {Id: %s}",
+                         config_file, replicas[replica_no], replicas_name[replica_no], olympus,
+                         extra=logger.NODE_INFO)
+
         elif replica_no == len(replicas) - 1:
             self.prev = replicas[replica_no - 1]
             self.me = replicas[replica_no]
             self.next_r = None
+ 
+            # Setting log file for tail Node
+
+            logger.setLogFormatting(replicas_name[replica_no] + '.log', logger.getLogDir(),
+                                    logging.INFO)
+            logger.setLogNodeInfo(self, replicas_name[replica_no])
+
+            # Log the received values
+
+            logging.info("TAIL received setup - config_file: %s replica_list: " +
+                         "%s replica_name: %s olympus: {Id: %s}",
+                         config_file, replicas[replica_no], replicas_name[replica_no], olympus,
+                         extra=logger.NODE_INFO)
+
         else:
             self.prev = replicas[replica_no - 1]
             self.me = replicas[replica_no]
             self.next_r = replicas[replica_no + 1]
+ 
+            # Setting log file for other replica Node
+
+            logger.setLogFormatting(replicas_name[replica_no] + '.log', logger.getLogDir(),
+                                    logging.INFO)
+            logger.setLogNodeInfo(self, replicas_name[replica_no])
+
+            # Log the received values
+
+            logging.info("Replica received setup - config_file: %s replica_list: " +
+                         "%s replica_name: %s olympus: {Id: %s}",
+                         config_file, replicas[replica_no], replicas_name[replica_no], olympus,
+                         extra=logger.NODE_INFO)
+
        
         ## Setting timeout for replica head and non-head
         config = config_parser.get_config(config_file)
@@ -46,8 +97,13 @@ class replica(process):
  
         if prev == None:
             self.time_out = head_time_out
+            logging.info("HEAD timeout - %s", str(head_time_out),
+                         extra=logger.NODE_INFO)
         else:
             self.time_out = non_head_time_out
+            logging.info("Replica timeout - %s", str(non_head_time_out),
+                         extra=logger.NODE_INFO)
+        return
 
     def create_order_proof(slot_no, order_string):
         ## TODO: Add digital signature as the last column
@@ -67,26 +123,42 @@ class replica(process):
     
     # Retransmission ack from head to replica
     def receive(msg=('retransmission_ack', order_id), from_ =replicas[0]):
-        print('Received ack from head for retransmission, cancelling timeout')
+        if prev != None:
+            print('Received ack from head for retransmission, cancelling timeout')
+            logging.info("Received ack from head for retransmission, cancelling" +
+                         "timeout", extra=logger.NODE_INFO)
 
     # Eventually head will deal with re-transmission from replicas
     def receive(msg=('retransmission_to_head', client, replica, order_id, order,)):
-        print('Retrnsmission request forwarded from replica ......')
+
         if self.prev == None:
+            print('Retransmission request forwarded from replica ......')
+            logging.info("Retransmission request forwarded from replica" +
+                         "......", extra=logger.NODE_INFO)
+
             if order_id in cache and len(cache[order_id]) == 2:
                 send(('retransmission_result', cache[order_id], replica_no,), to = client)
+
+                logging.info("Sending retransmission_ack ACK: {orderId: %s}",
+                             str(order_id), extra=logger.NODE_INFO)
+
                 send(('retransmission_ack', order_id), to = replica)
+
             elif order_id in cache and len(cache[order_id]) == 1:
                 if await(len(cache[order_id]) == 2):
                     send(('retransmission_result', cache[order_id], replica_no,), to = client)
                     send(('retransmission_ack', order_id), to = replica)
+
                 elif timeout(int(time_out) / 1000):
                     handle_client_req_at_head(client, order_id, order)
                     if await(len(cache[order_id]) == 2):
                         send(('retransmission_result', cache[order_id], replica_no,), to = client)
                         send(('retransmission_ack', order_id), to = replica)
+
                     elif timeout(int(time_out) / 1000):
                         print("Request of reconfiguration from head")
+                        logging.info("Request of reconfiguration from head",
+                                     extra=logger.NODE_INFO)
         else:
             print('I am not the head to eventually deal with re transmission request')
 

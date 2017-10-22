@@ -49,9 +49,9 @@ class client(process):
 
         # Log the received values
 
-        logging.info("Client setup - config_file: %s olympus:" +
-                     "{Name: %s, Id: %s}", config_file, 
-                     olympus_name, self.olympus, extra=logger.NODE_INFO)
+        logging.info("Client received setup - config_file: %s olympus:" +
+                     "{Name: %s, Id: %s}", config_file, olympus_name,
+                     self.olympus, extra=logger.NODE_INFO)
         return
 
     def verify_result(result, request_id):
