@@ -176,6 +176,25 @@ class replica(process):
         digest = HASHER(msg, encoder=nacl.encoding.HexEncoder)
         signed = sign_key.sign(digest)
         return (result, order, [signed])
+
+    def is_valid_result_proof(result_proofs):
+        if len(result_proofs) < 1:
+            return False
+        result = result_proofs[0][0]
+        order = result_proofs[0][1]
+        for ind in range(0, len(replicas)):
+            result_proof = result_proofs[ind]
+            pred_result = result_proof[0]
+            pred_order = result_proof[1]
+            if result != pred_result or order != pred_order:
+                return False
+            for sec in range(0, ind + 1):
+                verify_key = replica_verify_keys[sec]
+                try:
+                    verify_key.verify(result_proof[2][sec])
+                except nacl.exceptions.BadSignatureError:
+                    return False
+        return True        
         
     def is_valid_order_proofs(order_proofs):
         if len(order_proofs) < 1:
@@ -298,11 +317,14 @@ class replica(process):
                 result = command_executor.get_result(order_req, running_state)
                 predecessor_results = result_proofs[replica_no - 1][2]
                 result_proofs.append(combine_result_proof(result, order_req, predecessor_results))
-                cache[unique_order_ide] = [result, result_proofs]
-                send(('result_proof', (result, result_proofs), self.replica_no, unique_order_ide), to = client)
-                history.append(order_proofs)
-                print("sending result proof shuttle back")
-                send(('result_shuttle', unique_order_ide, client_no, result_proofs,), to = self.prev)
+                if is_valid_result_proof(result_proofs):
+                    cache[unique_order_ide] = [result, result_proofs]
+                    send(('result_proof', (result, result_proofs), self.replica_no, unique_order_ide), to = client)
+                    history.append(order_proofs)
+                    print("sending result proof shuttle back")
+                    send(('result_shuttle', unique_order_ide, client_no, result_proofs,), to = self.prev)
+                else:
+                    print("Result proof error so raise reconfiguration")
 
     
     # Return Shuttle from next
