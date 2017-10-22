@@ -1,5 +1,5 @@
 # test case name.  Can be used to trigger test case specific code in client
-test_case_name = test1
+test_case_name = single_client_with_no_failure_with_workload
 
 # number of failures to tolerate.  number of replicas is 2t+1.
 t = 1

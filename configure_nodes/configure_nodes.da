@@ -64,8 +64,8 @@ def main():
     oly_signing_key = nacl.signing.SigningKey.generate()
     oly_verify_key = oly_signing_key.verify_key
 
-    client_hosts = [int(cl_host) for cl_host in
-                    config_values[client.CLIENT_HOSTS].split(';')]
+    #client_hosts = [int(cl_host) for cl_host in
+    #                config_values[client.CLIENT_HOSTS].split(';')]
 
     # Initialize clients at respective hosts.
     # Number of clients and their hosts is read from config file
@@ -82,7 +82,8 @@ def main():
 
         # TODO: Right now only supporting localhost.
 
-        host_name = hosts[client_hosts[client_no]]
+        #host_name = hosts[client_hosts[client_no]]
+        host_name = 'localhost'
         if host_name != 'localhost':
             node_name += '@' + host_name
         client_list.append(new(client.client, num=1, at=node_name))
@@ -109,7 +110,6 @@ def main():
         logger.cleanLogFile(node_name+".log", logger.getLogDir())
 
         # TODO: Right now only supporting localhost.
-
         host_name = hosts[replica_hosts[replica_no]]
         if host_name != 'localhost':
             node_name += '@' + host_name
