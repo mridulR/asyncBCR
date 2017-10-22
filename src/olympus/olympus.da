@@ -43,7 +43,7 @@ class olympus(process):
             logging.info("Sending CURRENT_CONFIG to : %s", str(client),
                          extra=logger.NODE_INFO)
 
-            send(('rcv_curr_config', self.replica_list, self.replica_name),to=client)
+            send(('rcv_curr_config', replica_list, replica_name, replica_verify_keys),to=client)
         else:
             logger.setLogFormatting(self.name + '.log',
                                     logger.getLogDir(), logging.ERROR)

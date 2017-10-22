@@ -10,6 +10,8 @@ from src.utils import command_executor
 from random import randint
 import re
 import random
+import nacl.encoding
+import nacl.signing
 
 # Configuration keys for client
 
@@ -36,6 +38,7 @@ class client(process):
         
         self.current_replicas = []
         self.current_replicas_name = []
+        self.replica_verify_keys = []
         # Setting the logging format for the CONFIG_NODE
         # Default logging is INFO for CONFIG_NODE.
         # Other applicable values - logging.WARN, logging.CRITICAL,
@@ -54,6 +57,18 @@ class client(process):
                      self.olympus, extra=logger.NODE_INFO)
         return
 
+    def verify_result_proof(result_proofs):
+        if len(result_proofs) < 1:
+            print("No result proofs found")
+        for ind in range(0, len(result_proofs)):
+            rslt_proof = result_proofs[ind]
+            verify_key = replica_verify_keys[ind]
+            try:
+                verify_key.verify(rslt_proof)
+            except nacl.exceptions.BadSignatureError:
+                print("Result proof verification failed hence re-transmitting")
+        print("Result proof verification passed")
+
     def verify_result(result, request_id):
         if VER_MODE[0] == config[VER_STRATEGY]:
             if result == result_map[request_id]:
@@ -62,10 +77,11 @@ class client(process):
                 print("Failed")
         return
         
-    def receive(msg=('rcv_curr_config', replicas, replicas_name), from_=self.olympus):
+    def receive(msg=('rcv_curr_config', replicas, replicas_name, replica_verify_keys), from_=self.olympus):
         if int(len(replicas)) > 0:
             self.current_replicas = replicas
             self.current_replicas_name = replicas_name
+            self.replica_verify_keys = replica_verify_keys
         else:
             print("Client received no replica from Olympus for" +
                   "sending requests !!!", extra=logger.NODE_INFO)
@@ -75,7 +91,8 @@ class client(process):
     def receive(msg=('result_proof', result_proof, replica_no, request_id)):
 
         #verify_result_proof(result_proof) ---- > Part of algorithm
-        
+        verify_result_proof(result_proof[1])
+
         # Client acting as tester
         verify_result(result_proof[0], request_id)
         logging.info("Client received result_proof from repli" +
@@ -129,7 +146,7 @@ class client(process):
                 retransmission_flag = True
                 while retransmission_flag:
                     send(('req_curr_config', self), to=olympus)
-                    await(some(received(('rcv_curr_config', _, _))))
+                    await(some(received(('rcv_curr_config', _, _, _))))
                     for rep in current_replicas:
                         print('sending retransmission to : ', str(rep))
                         send(('retransmission', self, request_id, order), to=rep)
@@ -149,7 +166,7 @@ class client(process):
                      extra=logger.NODE_INFO)
 
         send(('req_curr_config', self), to=olympus)
-        await(some(received(('rcv_curr_config', _, _))))
+        await(some(received(('rcv_curr_config', _, _, _))))
         
         client_work_load_ind = WORK_LOAD + '[' + str(client_no) + ']'
         if client_work_load_ind in config:

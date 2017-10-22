@@ -211,7 +211,8 @@ class replica(process):
             print("I am not the head to take order request from client")
 
     # Forward Shuttle to next
-    def receive(msg=('forward_shuttle', client, unique_order_ide, order_proofs, result_proof, ), from_ = self.prev):
+    def receive(msg=('forward_shuttle', client, unique_order_ide, \
+         order_proofs, result_proofs, ), from_ = self.prev):
         if self.next_r != None:
             print("Forwarding order request to next : ", order_proofs)
             if is_valid_order_proofs(order_proofs):
@@ -220,9 +221,9 @@ class replica(process):
                 order_proofs.append(combine_order_proof(current_slot, order_req, predecessor_order_proof))
                 result = command_executor.get_result(order_req, running_state)
                 cache[unique_order_ide] = [result]
-                result_proof.append(get_result_proof(result)) 
+                result_proofs.append(get_result_proof(result)) 
                 send(('forward_shuttle', client, unique_order_ide, \
-                     order_proofs, result_proof,), to = self.next_r)
+                     order_proofs, result_proofs,), to = self.next_r)
             ## else make reconfiguration call to olympus
         else:
             print("I am the tail and sending to client")
@@ -230,12 +231,12 @@ class replica(process):
                 current_slot, order_req = get_slot_order(order_proofs)
                 order_proofs.append(create_order_proof(current_slot, order_req))
                 result = command_executor.get_result(order_req, running_state)
-                result_proof.append(get_result_proof(result))
-                cache[unique_order_ide] = [result, result_proof]
-                send(('result_proof', (result, result_proof), self.replica_no, unique_order_ide), to = client)
+                result_proofs.append(get_result_proof(result))
+                cache[unique_order_ide] = [result, result_proofs]
+                send(('result_proof', (result, result_proofs), self.replica_no, unique_order_ide), to = client)
                 history.append(order_proofs)
                 print("sending result proof shuttle back")
-                send(('result_shuttle', unique_order_ide, result_proof,), to = self.prev)
+                send(('result_shuttle', unique_order_ide, result_proofs,), to = self.prev)
     
     # Return Shuttle from next
     def receive(msg=('result_shuttle', unique_order_ide, result_proof,), from_ = self.next_r):
