@@ -412,20 +412,43 @@ class replica(process):
                     send(('result_shuttle', unique_order_ide, client_no, result_proofs,), to = self.prev)
                 else:
                     print("Result proof error so raise reconfiguration")
+
+    def trigger_failure_injection_for_result_shuttle(client_no, msg_count_by_client):
+        key = str(client_no) + "_" + str(msg_count_by_client)
+        if str(key) in client_result_shuttle_trigger:
+            val = client_result_shuttle_trigger[key]
+            if val == "change_operation":
+                set_trigger_for_change_operation(client_no, msg_count_by_client, replica_no)
+            elif val == "change_result":
+                set_trigger_for_change_result(client_no, msg_count_by_client, replica_no)
+            elif val == "drop_result_stmt":
+                set_trigger_for_drop_result_stmt(client_no, msg_count_by_client, replica_no)
     
     
     # Return Shuttle from next
-    def receive(msg=('result_shuttle', unique_order_ide, client_no, result_proof,), from_ = self.next_r):
+    def receive(msg=('result_shuttle', unique_order_ide, client_no, result_proof_pair,), from_ = self.next_r):
         if client_no not in client_result_shuttle_counter:
             client_result_shuttle_counter[client_no] = 0
         client_result_shuttle_counter[client_no] += 1
+        ## Injected code ---- Start   
+        trigger_failure_injection_for_shuttle(client_no, client_result_shuttle_counter[client_no])
+        ## Injected code -----End
         output("Received  result from next")
         result_with_proof = cache[unique_order_ide]
-        result_with_proof.append(result_proof)
+        result_with_proof.append(result_proof_pair)
         cache[unique_order_ide] = result_with_proof
+        # Injected code ----------- Start
+        injected_result = get_injected_result(client_no, client_result_shuttle_counter[client_no], replica_no)
+        if injected_result != None:
+            result_proofs = result_proof_pair[1]
+            result_proof_pair = ("OK", result_proofs)
+        if get_injected_drop_stmt(client_no, client_result_shuttle_counter[client_no], replica_no):
+            result_proofs = result_proof_pair[1][1:]
+            result_proof_pair = (result_proof_pair[0], result_proofs)
+        # Injected code ------ End
         if self.prev != None:
             print("Forwarding result proof to prev : ")
-            send(('result_shuttle', unique_order_ide, client_no, result_proof,), to = self.prev)
+            send(('result_shuttle', unique_order_ide, client_no, result_proof_pair,), to = self.prev)
         else:
             print("I am the Head and have received result proof shuttle")
 
