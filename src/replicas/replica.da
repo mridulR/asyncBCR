@@ -6,16 +6,21 @@ import time
 import re
 from src.utils import config_parser
 from src.utils import command_executor
+import nacl.encoding
+import nacl.signing
+import nacl.hash
+
 
 REPLICA_HOSTS = "replica_hosts"
 FAILURES_TO_TOLERATE = "t"
 HEAD_TIMEOUT = "head_timeout"
 NON_HEAD_TIMEOUT = "nonhead_timeout"
+HASHER = nacl.hash.sha256
 
 class replica(process):    
 
-    def setup(config_file, replica_no, replicas, replicas_name, olympus):
-
+    def setup(config_file, replica_no, replicas, replicas_name, olympus, \
+        oly_verify_key, replica_verify_keys, sign_key):
         ## cache for storing result and result proof
 
         self.cache = {}
@@ -104,17 +109,37 @@ class replica(process):
             logging.info("Replica timeout - %s", str(non_head_time_out),
                          extra=logger.NODE_INFO)
         return
+    
+    def combine_order_proof(slot_no, order_string, predecessor_orders):
+        tup = (str(slot_no), order_string, str(replica_no))
+        #tup_str = ''.join(tup)
+        signed = sign_key.sign(str.encode(str(tup)))
+        predecessor_orders.append(signed)
+        return (slot_no, order_string, replica_no, predecessor_orders)
 
     def create_order_proof(slot_no, order_string):
-        ## TODO: Add digital signature as the last column
-        return (slot_no, order_string, replica_no)
+        tup = (str(slot_no), order_string, str(replica_no))
+        #tup_str = ''.join(tup)
+        signed = sign_key.sign(str.encode(str(tup)))
+        predecessor_order_proofs = [signed]
+        return (slot_no, order_string, replica_no, predecessor_order_proofs)
 
     def get_result_proof(result):
-        ## TODO: complete it
-        return result
-
-    def is_valid_order_proof(order_proof):
-        ## TODO: complete it
+        msg = 16 * str.encode(result)
+        digest = HASHER(msg, encoder=nacl.encoding.HexEncoder)
+        return sign_key.sign(digest)
+        
+    def is_valid_order_proofs(order_proofs):
+        if len(order_proofs) < 1:
+            return False
+        for ind in range(0, replica_no):
+            for sec in range(0, ind + 1):
+                order_proof = order_proofs[ind]
+                verify_key = replica_verify_keys[sec]
+                try:
+                    verify_key.verify(order_proof[3][sec])
+                except nacl.exceptions.BadSignatureError:
+                    return False 
         return True
 
     def get_slot_order(order_proof):
@@ -166,17 +191,16 @@ class replica(process):
         print("Forwarding order request to next : ", order_req)
         current_slot += 1
         ## No need to verify order proof at head
-        order_proof = []
+        order_proofs = []
         ## order proof is a list of tuples (slot, order, replica, [digtal signs of preceding])
-        order_proof.append(create_order_proof(current_slot, order_req))
+        order_proofs.append(create_order_proof(current_slot, order_req))
         result = command_executor.get_result(order_req, running_state)
-        print("*****" + str(order_proof), "result - ", result)
         if result != None:
             cache[unique_order_ide] = [result]
             result_proof = []
             result_proof.append(get_result_proof(result))
             send(('forward_shuttle', client, unique_order_ide, \
-                order_proof, result_proof,), to = next_r)    
+                order_proofs, result_proof,), to = next_r)    
 
     # Only head is supposed to handle order request from client    
     def receive(msg=('request_order', client, unique_order_ide, order_req,)):
@@ -187,29 +211,29 @@ class replica(process):
             print("I am not the head to take order request from client")
 
     # Forward Shuttle to next
-    def receive(msg=('forward_shuttle', client, unique_order_ide, order_proof, result_proof, ), from_ = self.prev):
-        output("Received order request from prev for client" + str(client))
+    def receive(msg=('forward_shuttle', client, unique_order_ide, order_proofs, result_proof, ), from_ = self.prev):
         if self.next_r != None:
-            print("Forwarding order request to next : ", order_proof)
-            if is_valid_order_proof(order_proof):
-                current_slot, order_req = get_slot_order(order_proof)
-                order_proof.append(create_order_proof(current_slot, order_req))
+            print("Forwarding order request to next : ", order_proofs)
+            if is_valid_order_proofs(order_proofs):
+                current_slot, order_req = get_slot_order(order_proofs)
+                predecessor_order_proof = order_proofs[replica_no - 1][3]
+                order_proofs.append(combine_order_proof(current_slot, order_req, predecessor_order_proof))
                 result = command_executor.get_result(order_req, running_state)
                 cache[unique_order_ide] = [result]
                 result_proof.append(get_result_proof(result)) 
                 send(('forward_shuttle', client, unique_order_ide, \
-                     order_proof, result_proof,), to = self.next_r)
+                     order_proofs, result_proof,), to = self.next_r)
             ## else make reconfiguration call to olympus
         else:
             print("I am the tail and sending to client")
-            if is_valid_order_proof(order_proof):
-                current_slot, order_req = get_slot_order(order_proof)
-                order_proof.append(create_order_proof(current_slot, order_req))
+            if is_valid_order_proofs(order_proofs):
+                current_slot, order_req = get_slot_order(order_proofs)
+                order_proofs.append(create_order_proof(current_slot, order_req))
                 result = command_executor.get_result(order_req, running_state)
                 result_proof.append(get_result_proof(result))
                 cache[unique_order_ide] = [result, result_proof]
                 send(('result_proof', (result, result_proof), self.replica_no, unique_order_ide), to = client)
-                history.append(order_proof)
+                history.append(order_proofs)
                 print("sending result proof shuttle back")
                 send(('result_shuttle', unique_order_ide, result_proof,), to = self.prev)
     

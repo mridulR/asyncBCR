@@ -6,6 +6,8 @@ import subprocess
 import time
 import os
 import logging
+import nacl.encoding
+import nacl.signing
 
 from src.utils import config_parser
 from src.utils import logger
@@ -14,6 +16,8 @@ replica = import_da('src.replicas.replica')
 olympus = import_da('src.olympus.olympus')
 client = import_da('src.client.client')
 
+def verify_key(sign_key):
+    return sign_key.verify_key
 
 def main():
 
@@ -56,6 +60,9 @@ def main():
     if olympus_host != 'localhost':
         oly_name += '@' + olympus_host
     oly = new(olympus.olympus, num=1, at=oly_name)
+    
+    oly_signing_key = nacl.signing.SigningKey.generate()
+    oly_verify_key = oly_signing_key.verify_key
 
     client_hosts = [int(cl_host) for cl_host in
                     config_values[client.CLIENT_HOSTS].split(';')]
@@ -65,6 +72,7 @@ def main():
 
     client_list = []
     client_name = []
+    client_signing_keys = []
     for client_no in range(0, int(config_values[client.NUM_OF_CLIENTS])):
         node_name = 'ClientNode' + str(client_no)
 
@@ -78,6 +86,7 @@ def main():
         if host_name != 'localhost':
             node_name += '@' + host_name
         client_list.append(new(client.client, num=1, at=node_name))
+        client_signing_keys.append(nacl.signing.SigningKey.generate())
         client_name.append(node_name)
         logging.info("Created client- {Name: %s, Id: %s}",
                      client_name[-1], client_list[-1], extra=logger.NODE_INFO)
@@ -90,6 +99,7 @@ def main():
 
     replica_list = []
     replica_name = []
+    replica_signing_keys = []
     num_of_replicas = 2 * int(config_values[replica.FAILURES_TO_TOLERATE]) + 1
     for replica_no in range(0, num_of_replicas):
         node_name = 'ReplicaNode' + str(replica_no)
@@ -105,9 +115,12 @@ def main():
             node_name += '@' + host_name
         replica_list.append(new(replica.replica, num=1, at=node_name))
         replica_name.append(node_name)
+        replica_signing_keys.append(nacl.signing.SigningKey.generate())
         logging.info("Created replica- {Name: %s, Id: %s}",
                      replica_name[-1], replica_list[-1],
                      extra=logger.NODE_INFO)
+    
+    replica_verify_keys = list(map( verify_key, replica_signing_keys))    
 
     # After clients have been initialized, call setup on respective client
     # nodes
@@ -115,7 +128,7 @@ def main():
 
     for replica_no in range(0, num_of_replicas):
         setup(replica_list[replica_no], [config_file, replica_no, replica_list,
-                replica_name, oly])
+                replica_name, oly, oly_verify_key, replica_verify_keys, replica_signing_keys[replica_no]])
         logging.info("Setting up replica- {Name: %s, Id: %s}",
                      replica_name[replica_no], replica_list[replica_no],
                      extra=logger.NODE_INFO)
@@ -131,7 +144,7 @@ def main():
                      client_name[client_no], client_list[client_no],
                      extra=logger.NODE_INFO)
 
-    setup(oly, [config_file, replica_list, replica_name, oly_name, oly])
+    setup(oly, [config_file, replica_list, replica_name, oly_name, oly, oly_signing_key, replica_verify_keys])
     logging.info("Setting up olympus- {Name: %s, Id: %s}", oly_name,
                  oly, extra=logger.NODE_INFO)
 

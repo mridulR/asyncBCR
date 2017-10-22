@@ -5,6 +5,9 @@ import sys
 import os
 import logging
 from src.utils import logger
+import nacl.encoding
+import nacl.signing
+
 
 # Configuration Params to be read from config file
 
@@ -13,7 +16,7 @@ HOST = 'olympus_host'
 
 class olympus(process):
 
-    def setup(config_file, replica_list, replica_name, name, nodeId,):
+    def setup(config_file, replica_list, replica_name, name, nodeId, signing_key, replica_verify_keys):
 
         # Setting the logging format for the CONFIG_NODE
         # Default logging is INFO for CONFIG_NODE.
@@ -21,6 +24,7 @@ class olympus(process):
         # logging.ERROR, logging.DEBUG
         # Use respective logging.warn, logging.critical, logging.error,
         # logging.debug
+
 
         logger.setLogFormatting(self.name + '.log', logger.getLogDir(),
                                 logging.INFO)

@@ -97,26 +97,26 @@ class client(process):
 
     def generate_psedorandom(seed, num):
         orders = []
-        supported_operations = ['put', 'get', 'append', 'slice']
+        supported_operations = ["put", "get", "append", "slice"]
         for ind in range(0, num):
             rand_num = random.randint(seed, seed + num)
             rand_index = rand_num % 4
             rand_oper = supported_operations[rand_index]
-            rand_key = 'randKey' + str(rand_num)
-            rand_value = 'randValue' + str(rand_num)
+            rand_key = "randKey" + str(rand_num)
+            rand_value = "randValue" + str(rand_num)
             if rand_index == 0:
-                orders.append(rand_oper + '(' + rand_key + ',' + rand_value + ')')
+                orders.append(rand_oper + "(" + rand_key + "," + rand_value + ")")
             elif rand_index == 1:
-                orders.append(rand_oper + '(' + rand_key + ')')
+                orders.append(rand_oper + "(" + rand_key + ")")
             elif rand_index == 2:
-                append_value = 'append_rand' + str(random.randint(seed, seed + num))
-                orders.append(rand_oper + '(' + rand_key + ',' + append_value + ')')
+                append_value = "append_rand" + str(random.randint(seed, seed + num))
+                orders.append(rand_oper + "(" + rand_key + "," + append_value + ")")
             elif rand_index == 3:
                 expected_len = len(rand_value)
                 slice_start = random.randint(0, expected_len)
                 slice_end = random.randint(0, expected_len)
-                orders.append(rand_oper + '(' + rand_key + ',' \
-                    + str(slice_start) + ':' + str(slice_end) + ')')
+                orders.append(rand_oper + "(" + rand_key + "," \
+                    + str(slice_start) + ":" + str(slice_end) + ")")
         return orders
 
     def execute_order(order, request_id):
