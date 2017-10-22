@@ -4,7 +4,7 @@ import sys
 import os
 import logging
 import time
-from src.utils import Logger
+from src.utils import logger
 from src.utils import config_parser
 from src.utils import command_executor
 from random import randint
@@ -35,6 +35,7 @@ class client(process):
         self.result_map = {}
         
         self.current_replicas = []
+        self.current_replicas_name = []
         # Setting the logging format for the CONFIG_NODE
         # Default logging is INFO for CONFIG_NODE.
         # Other applicable values - logging.WARN, logging.CRITICAL,
@@ -42,18 +43,15 @@ class client(process):
         # Use respective logging.warn, logging.critical, logging.error,
         # logging.debug
 
-        Logger.setLogFormatting(self.name + '.log', Logger.getLogDir(),
+        logger.setLogFormatting(self.name + '.log', logger.getLogDir(),
                                 logging.INFO)
-        Logger.setLogNodeInfo(self.nodeId, self.name)
+        logger.setLogNodeInfo(self.nodeId, self.name)
 
         # Log the received values
 
-        logging.info("Client {clientId: %s, clientName: %s} received setup - "  +
-                     "config_file: %s client_no: %s olympus - {olympusId: %s, " +
-                     "olympusName: %s}", self.nodeId,
-                     self.name, self.config_file, str(self.client_no),
-                     self.olympus, self.olympus_name,
-                     extra=Logger.NODE_INFO)
+        logging.info("Client setup - config_file: %s olympus:" +
+                     "{Name: %s, Id: %s}", config_file, 
+                     olympus_name, self.olympus, extra=logger.NODE_INFO)
         return
 
     def verify_result(result, request_id):
@@ -62,31 +60,40 @@ class client(process):
                 print("Passed")
             else:
                 print("Failed")
-
-
-    def receive(msg=('rcv_curr_config', replicas), from_=self.olympus):
+        return
+        
+    def receive(msg=('rcv_curr_config', replicas, replicas_name), from_=self.olympus):
         if int(len(replicas)) > 0:
             self.current_replicas = replicas
+            self.current_replicas_name = replicas_name
         else:
-            print("No replica to send order request to !!!")
+            print("Client received no replica from Olympus for" +
+                  "sending requests !!!", extra=logger.NODE_INFO)
         return
 
 
     def receive(msg=('result_proof', result_proof, replica_no, request_id)):
 
-        logging.info("client { clientId: %s, clientName: %s} received " +
-                     "result_proof from replica {replicaId: %s, replicaName:" +
-                     "%s}", self.nodeId, self.name, str(replica_no),
-                     str(replica_no), extra=Logger.NODE_INFO)
         #verify_result_proof(result_proof) ---- > Part of algorithm
         
         # Client acting as tester
         verify_result(result_proof[0], request_id)
+        logging.info("Client received result_proof from repli" +
+                     "ca {Name: %s, Id:%s}",
+                     self.current_replicas_name[int(replica_no)],
+                     self.current_replicas[int(replica_no)],
+                     extra=logger.NODE_INFO)
         return
 
     def receive(msg=('retransmission_result', result_proof, replica_no)):
         print ("Received Retransmission result ", replica_no )
         print (result_proof)
+        logging.info("Client received retransmission_result from" +
+                     "replica { Name:%s, Id:%s}",
+                     self.current_replicas_name[int(replica_no)],
+                     self.current_replicas[int(replica_no)],
+                     extra=logger.NODE_INFO)
+        return
 
     def generate_psedorandom(seed, num):
         orders = []
@@ -122,7 +129,7 @@ class client(process):
                 retransmission_flag = True
                 while retransmission_flag:
                     send(('req_curr_config', self), to=olympus)
-                    await(some(received(('rcv_curr_config', _))))
+                    await(some(received(('rcv_curr_config', _, _))))
                     for rep in current_replicas:
                         print('sending retransmission to : ', str(rep))
                         send(('retransmission', self, request_id, order), to=rep)
@@ -133,17 +140,16 @@ class client(process):
 
 
     def run():
+        logging.info("Running client...", extra=logger.NODE_INFO)
 
-        logging.info("Running client- clientId: %s clientName: %s",
-                     self.nodeId, self.name, extra=Logger.NODE_INFO)
-
-        logging.info("Client {clientId: %s, clientName: %s} sending request " +
-                     "for CURRENT_CONFIG to olympus {olympusId: %s," +
-                     "olympusName: %s} ", self.nodeId, self.name, self.olympus,
-                     self.olympus_name, extra=Logger.NODE_INFO)
+        print("Asking current config from olympus")
+        logging.info("Client sending request for CURRENT_" +
+                     "CONFIG to olympus {Name: %s, Id: %s} ",
+                     self.olympus_name, self.olympus,
+                     extra=logger.NODE_INFO)
 
         send(('req_curr_config', self), to=olympus)
-        await(some(received(('rcv_curr_config', _))))
+        await(some(received(('rcv_curr_config', _, _))))
         
         client_work_load_ind = WORK_LOAD + '[' + str(client_no) + ']'
         if client_work_load_ind in config:
