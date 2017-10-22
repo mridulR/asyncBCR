@@ -138,7 +138,7 @@ class client(process):
 
     def execute_order(order, request_id):
         if len(current_replicas) > 0:
-            send(('request_order', self, request_id, order), \
+            send(('request_order', self, client_no, request_id, order), \
                 to=current_replicas[0])
             if await(len(setof(a, received(('result_proof', _, _, _), from_ =a))) > 0):
                 pass
@@ -149,7 +149,7 @@ class client(process):
                     await(some(received(('rcv_curr_config', _, _, _))))
                     for rep in current_replicas:
                         print('sending retransmission to : ', str(rep))
-                        send(('retransmission', self, request_id, order), to=rep)
+                        send(('retransmission', self, client_no, request_id, order), to=rep)
                         if await(len(setof(a, received(('retransmission_result', _, _), from_ =a))) > 0):
                             retransmission_flag = False
                         elif timeout(int(time_out) / 1000):
