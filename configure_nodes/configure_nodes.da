@@ -26,8 +26,7 @@ def main():
     config_file = 'config/single_client_with_no_failure_with_workload.csv'
 
     # Cleanup the previous run log file for Config
-
-    logger.cleanLogFile('Config.log', logger.getLogDir())
+    logger.cleanLogDirectory(logger.getLogDir())
 
     # Setting the logging format for the CONFIG_NODE
     # Default logging is INFO for CONFIG_NODE.
@@ -51,10 +50,6 @@ def main():
     olympus_host = hosts[int(config_values[olympus.HOST])]
     oly_name = 'OlympusNode'
 
-    # Cleanup the previous run log file for Olympus
-
-    logger.cleanLogFile(oly_name+".log", logger.getLogDir())
-
     # Initialize olympus at respective host.
 
     if olympus_host != 'localhost':
@@ -75,10 +70,6 @@ def main():
     client_signing_keys = []
     for client_no in range(0, int(config_values[client.NUM_OF_CLIENTS])):
         node_name = 'ClientNode' + str(client_no)
-
-        # Cleanup the previous run log file for clients
-
-        logger.cleanLogFile(node_name+".log", logger.getLogDir())
 
         # TODO: Right now only supporting localhost.
 
@@ -104,10 +95,6 @@ def main():
     num_of_replicas = 2 * int(config_values[replica.FAILURES_TO_TOLERATE]) + 1
     for replica_no in range(0, num_of_replicas):
         node_name = 'ReplicaNode' + str(replica_no)
-
-        # Cleanup the previous run log file for replicas
-
-        logger.cleanLogFile(node_name+".log", logger.getLogDir())
 
         # TODO: Right now only supporting localhost.
         host_name = hosts[replica_hosts[replica_no]]

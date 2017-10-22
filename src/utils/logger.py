@@ -1,5 +1,7 @@
 import logging
 import os
+import glob, os, os.path
+
 
 FORMAT = '%(asctime)s.%(msecs)03d %(NodeName)s: %(NodeId)s:%(levelname)s: %(message)s'
 
@@ -29,4 +31,10 @@ def cleanLogFile(fname, logDir):
     print("CleanLogFile ------ ", name)
     if os.path.isfile(name):
         with open(name, 'w'): pass    
+    return
+
+def cleanLogDirectory(cleanDir):
+    filelist = glob.glob(os.path.join(cleanDir, "*.log"))
+    for f in filelist:
+        os.remove(f)
     return
