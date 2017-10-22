@@ -206,6 +206,9 @@ class replica(process):
     def receive(msg=('retransmission_to_head', client, client_no, replica, order_id, order,)):
 
         if self.prev == None:
+            if client_no not in client_fwd_rqst_counter:
+                client_fwd_rqst_counter[client_no] = 0
+            client_fwd_rqst_counter[client_no]
             print('Retransmission request forwarded from replica ......')
             logging.info("Retransmission request forwarded from replica" +
                          "......", extra=logger.NODE_INFO)
