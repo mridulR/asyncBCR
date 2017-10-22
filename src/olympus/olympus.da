@@ -25,7 +25,6 @@ class olympus(process):
         # Use respective logging.warn, logging.critical, logging.error,
         # logging.debug
 
-
         logger.setLogFormatting(self.name + '.log', logger.getLogDir(),
                                 logging.INFO)
         logger.setLogNodeInfo(self.nodeId, self.name)
