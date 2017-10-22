@@ -150,7 +150,13 @@ class replica(process):
                             key = cli_msg.group(1) + "_" + cli_msg.group(2)
                             client_result_shuttle_trigger[key] = cli_msg.group(3).strip()
                                                     
-    
+    def combine_result_proof(result, order, predecessor_results):
+        msg = 16 * str.encode(result)
+        digest = HASHER(msg, encoder=nacl.encoding.HexEncoder)
+        signed = sign_key.sign(digest)
+        predecessor_results.append(signed)
+        return (result, order, predecessor_results)   
+ 
     def combine_order_proof(slot_no, order_string, predecessor_orders):
         tup = (str(slot_no), order_string, str(replica_no))
         #tup_str = ''.join(tup)
@@ -165,10 +171,11 @@ class replica(process):
         predecessor_order_proofs = [signed]
         return (slot_no, order_string, replica_no, predecessor_order_proofs)
 
-    def get_result_proof(result):
+    def create_result_proof(result, order):
         msg = 16 * str.encode(result)
         digest = HASHER(msg, encoder=nacl.encoding.HexEncoder)
-        return sign_key.sign(digest)
+        signed = sign_key.sign(digest)
+        return (result, order, [signed])
         
     def is_valid_order_proofs(order_proofs):
         if len(order_proofs) < 1:
@@ -208,7 +215,7 @@ class replica(process):
         if self.prev == None:
             if client_no not in client_fwd_rqst_counter:
                 client_fwd_rqst_counter[client_no] = 0
-            client_fwd_rqst_counter[client_no]
+            client_fwd_rqst_counter[client_no] += 1
             print('Retransmission request forwarded from replica ......')
             logging.info("Retransmission request forwarded from replica" +
                          "......", extra=logger.NODE_INFO)
@@ -250,7 +257,7 @@ class replica(process):
         if result != None:
             cache[unique_order_ide] = [result]
             result_proof = []
-            result_proof.append(get_result_proof(result))
+            result_proof.append(create_result_proof(result, order_req))
             send(('forward_shuttle', client, client_no, unique_order_ide, \
                 order_proofs, result_proof,), to = next_r)    
 
@@ -278,7 +285,8 @@ class replica(process):
                 order_proofs.append(combine_order_proof(current_slot, order_req, predecessor_order_proof))
                 result = command_executor.get_result(order_req, running_state)
                 cache[unique_order_ide] = [result]
-                result_proofs.append(get_result_proof(result)) 
+                predecessor_results = result_proofs[replica_no - 1][2]
+                result_proofs.append(combine_result_proof(result, order_req, predecessor_results)) 
                 send(('forward_shuttle', client, client_no, unique_order_ide, \
                      order_proofs, result_proofs,), to = self.next_r)
             ## else make reconfiguration call to olympus
@@ -286,9 +294,10 @@ class replica(process):
             print("I am the tail and sending to client")
             if is_valid_order_proofs(order_proofs):
                 current_slot, order_req = get_slot_order(order_proofs)
-                order_proofs.append(create_order_proof(current_slot, order_req))
+                ##order_proofs.append(create_order_proof(current_slot, order_req))
                 result = command_executor.get_result(order_req, running_state)
-                result_proofs.append(get_result_proof(result))
+                predecessor_results = result_proofs[replica_no - 1][2]
+                result_proofs.append(combine_result_proof(result, order_req, predecessor_results))
                 cache[unique_order_ide] = [result, result_proofs]
                 send(('result_proof', (result, result_proofs), self.replica_no, unique_order_ide), to = client)
                 history.append(order_proofs)

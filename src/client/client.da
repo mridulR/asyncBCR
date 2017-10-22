@@ -58,16 +58,29 @@ class client(process):
         return
 
     def verify_result_proof(result_proofs):
+        if is_valid_order_proofs(result_proofs):
+            print("Result proof verification passed")
+        else:
+            print("Result proof verifivation failed")
+
+    def is_valid_order_proofs(result_proofs):
         if len(result_proofs) < 1:
-            print("No result proofs found")
-        for ind in range(0, len(result_proofs)):
-            rslt_proof = result_proofs[ind]
-            verify_key = replica_verify_keys[ind]
-            try:
-                verify_key.verify(rslt_proof)
-            except nacl.exceptions.BadSignatureError:
-                print("Result proof verification failed hence re-transmitting")
-        print("Result proof verification passed")
+            return False
+        result = result_proofs[0][0]
+        order = result_proofs[0][1]
+        for ind in range(0, len(current_replicas)):
+            result_proof = result_proofs[ind]
+            pred_result = result_proof[0]
+            pred_order = result_proof[1]
+            if result != pred_result or order != pred_order:
+                return False
+            for sec in range(0, ind + 1):
+                verify_key = replica_verify_keys[sec]
+                try:
+                    verify_key.verify(result_proof[2][sec])
+                except nacl.exceptions.BadSignatureError:
+                    return False
+        return True
 
     def verify_result(result, request_id):
         if VER_MODE[0] == config[VER_STRATEGY]:
