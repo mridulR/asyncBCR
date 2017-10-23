@@ -1,15 +1,16 @@
-from src.utils import logger 
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
 import sys
 import os
 import logging
 import time
 import re
-from src.utils import config_parser
-from src.utils import command_executor
 import nacl.encoding
 import nacl.signing
 import nacl.hash
-
+from src.utils import config_parser
+from src.utils import command_executor
+from src.utils import logger
 
 REPLICA_HOSTS = "replica_hosts"
 FAILURES_TO_TOLERATE = "t"
@@ -17,126 +18,116 @@ HEAD_TIMEOUT = "head_timeout"
 NON_HEAD_TIMEOUT = "nonhead_timeout"
 HASHER = nacl.hash.sha256
 
+
 class replica(process):
+    """ An implementation to handle all the replicas."""
 
+    def setup(config_file, replica_no, replicas, replicas_name, olympus,
+              oly_verify_key, replica_verify_keys, sign_key):
+        """ Setting up the replica based on configuration."""
 
-    def setup(config_file, replica_no, replicas, replicas_name, olympus, \
-        oly_verify_key, replica_verify_keys, sign_key):
-        ## cache for storing result and result proof
-
+        # cache for storing result and result proof
         self.cache = {}
-        
         self.client_direct_msg_trigger = {}
         self.client_fwd_rqst_trigger = {}
         self.client_shuttle_trigger = {}
         self.client_result_shuttle_trigger = {}
-
         self.client_direct_msg_counter = {}
         self.client_fwd_rqst_counter = {}
         self.client_shuttle_counter = {}
         self.client_result_shuttle_counter = {}
-        
-        #Testing
+
+        # Testing
         self.global_operation = ""
         self.injected_get_operation = {}
         self.injected_change_result = {}
         self.injected_drop_result = {}
 
-        ## current_slot updated only by head replica
-
+        # current_slot updated only by head replica
         self.current_slot = 0
 
-        ## running state of replica
-
+        # running state of replica
         self.running_state = {}
 
-        ## history of replica
-
+        # history of replica
         self.history = []
 
-
-        ## Update next and previous replica by each replica
-
+        # Update next and previous replica by each replica
         self.num_of_replicas = len(replicas)
-        if replica_no == 0:
+        if replica_no is 0:
             self.prev = None
             self.me = replicas[0]
             self.next_r = replicas[1]
-            
-            # Setting log file for head Node
 
-            logger.setLogFormatting(replicas_name[replica_no] + '.log', logger.getLogDir(),
-                                    logging.INFO)
+            # Setting log file for head Node
+            logger.setLogFormatting(replicas_name[replica_no] + '.log',
+                                    logger.getLogDir(), logging.INFO)
             logger.setLogNodeInfo(self, replicas_name[replica_no])
 
             # Log the received values
+            logging.info("HEAD received setup - config_file: %s replica_list" +
+                         ":%s replica_name: %s olympus: {Id: %s}", config_file,
+                         replicas[replica_no], replicas_name[replica_no],
+                         olympus, extra=logger.NODE_INFO)
 
-            logging.info("HEAD received setup - config_file: %s replica_list: " +
-                         "%s replica_name: %s olympus: {Id: %s}",
-                         config_file, replicas[replica_no], replicas_name[replica_no], olympus,
-                         extra=logger.NODE_INFO)
-
-        elif replica_no == len(replicas) - 1:
+        elif replica_no is len(replicas) - 1:
             self.prev = replicas[replica_no - 1]
             self.me = replicas[replica_no]
             self.next_r = None
- 
-            # Setting log file for tail Node
 
-            logger.setLogFormatting(replicas_name[replica_no] + '.log', logger.getLogDir(),
-                                    logging.INFO)
+            # Setting log file for tail Node
+            logger.setLogFormatting(replicas_name[replica_no] + '.log',
+                                    logger.getLogDir(), logging.INFO)
             logger.setLogNodeInfo(self, replicas_name[replica_no])
 
             # Log the received values
-
-            logging.info("TAIL received setup - config_file: %s replica_list: " +
-                         "%s replica_name: %s olympus: {Id: %s}",
-                         config_file, replicas[replica_no], replicas_name[replica_no], olympus,
-                         extra=logger.NODE_INFO)
+            logging.info("TAIL received setup - config_file: %s replica_list" +
+                         ":%s replica_name: %s olympus: {Id: %s}", config_file,
+                         replicas[replica_no], replicas_name[replica_no],
+                         olympus, extra=logger.NODE_INFO)
 
         else:
             self.prev = replicas[replica_no - 1]
             self.me = replicas[replica_no]
             self.next_r = replicas[replica_no + 1]
- 
-            # Setting log file for other replica Node
 
-            logger.setLogFormatting(replicas_name[replica_no] + '.log', logger.getLogDir(),
-                                    logging.INFO)
+            # Setting log file for other replica Node
+            logger.setLogFormatting(replicas_name[replica_no] + '.log',
+                                    logger.getLogDir(), logging.INFO)
             logger.setLogNodeInfo(self, replicas_name[replica_no])
 
             # Log the received values
-
-            logging.info("Replica received setup - config_file: %s replica_list: " +
-                         "%s replica_name: %s olympus: {Id: %s}",
-                         config_file, replicas[replica_no], replicas_name[replica_no], olympus,
+            logging.info("Replica received setup - config_file: %s " +
+                         "replica_list: %s replica_name: %s olympus: {Id: %s}",
+                         config_file, replicas[replica_no],
+                         replicas_name[replica_no], olympus,
                          extra=logger.NODE_INFO)
 
-       
-        ## Setting timeout for replica head and non-head
+        # Setting timeout for replica head and non-head
         self.config = config_parser.get_config(config_file)
         self.head_time_out = config[HEAD_TIMEOUT]
         self.non_head_time_out = config[NON_HEAD_TIMEOUT]
- 
-        if prev == None:
+
+        if prev is None:
             self.time_out = head_time_out
-            logging.info("HEAD timeout - %s", str(head_time_out),
+            logging.info("HEAD timeout value- %s", str(head_time_out),
                          extra=logger.NODE_INFO)
         else:
             self.time_out = non_head_time_out
-            logging.info("Replica timeout - %s", str(non_head_time_out),
+            logging.info("Replica timeout value- %s", str(non_head_time_out),
                          extra=logger.NODE_INFO)
         return
 
     def set_failure_triggers():
-        for key,value in config.items():
+        for key, value in config.items():
             trigger_failure_list = []
             if key.startswith('failures'):
                 config_replica = re.search(r'\[(.*?),(.*?)\]', key)
                 config = int(config_replica.group(1))
                 replica = int(config_replica.group(2))
-                ### In phase 2 only concerned with config 0
-                if config == 0 and replica == replica_no:
+
+                # In phase 2 only concerned with config 0
+                if config is 0 and replica is replica_no:
                     trigger_failures = [each.strip() for each in value.split(';')]
                     for trigg_fail in trigger_failures:
                         if trigg_fail.startswith("client_request"):
@@ -155,24 +146,22 @@ class replica(process):
                             cli_msg = re.search(r'result_shuttle\((.*?),(.*?)\),(.*?)\(\)', trigg_fail)
                             key = cli_msg.group(1) + "_" + cli_msg.group(2)
                             client_result_shuttle_trigger[key] = cli_msg.group(3).strip()
-                                                    
+
     def combine_result_proof(result, order, predecessor_results):
         msg = 16 * str.encode(result)
         digest = HASHER(msg, encoder=nacl.encoding.HexEncoder)
         signed = sign_key.sign(digest)
         predecessor_results.append(signed)
-        return (result, order, predecessor_results)   
- 
+        return (result, order, predecessor_results)
+
     def combine_order_proof(slot_no, order_string, predecessor_orders):
         tup = (str(slot_no), order_string, str(replica_no))
-        #tup_str = ''.join(tup)
         signed = sign_key.sign(str.encode(str(tup)))
         predecessor_orders.append(signed)
         return (slot_no, order_string, replica_no, predecessor_orders)
 
     def create_order_proof(slot_no, order_string):
         tup = (str(slot_no), order_string, str(replica_no))
-        #tup_str = ''.join(tup)
         signed = sign_key.sign(str.encode(str(tup)))
         predecessor_order_proofs = [signed]
         return (slot_no, order_string, replica_no, predecessor_order_proofs)
@@ -192,7 +181,7 @@ class replica(process):
             result_proof = result_proofs[ind]
             pred_result = result_proof[0]
             pred_order = result_proof[1]
-            if result != pred_result or order != pred_order:
+            if result is not pred_result or order is not pred_order:
                 return False
             for sec in range(0, ind + 1):
                 verify_key = replica_verify_keys[sec]
@@ -200,8 +189,8 @@ class replica(process):
                     verify_key.verify(result_proof[2][sec])
                 except nacl.exceptions.BadSignatureError:
                     return False
-        return True        
-        
+        return True
+
     def is_valid_order_proofs(order_proofs):
         if len(order_proofs) < 1:
             return False
@@ -213,31 +202,33 @@ class replica(process):
             order_proof = order_proofs[ind]
             pred_slot = order_proof[0]
             pred_order = order_proof[1]
-            if slot != pred_slot or order != pred_order:
+            if slot is not pred_slot or order is not pred_order:
                 return False
             for sec in range(0, ind + 1):
                 verify_key = replica_verify_keys[sec]
                 try:
                     verify_key.verify(order_proof[3][sec])
                 except nacl.exceptions.BadSignatureError:
-                    return False 
+                    return False
         return True
 
     def get_slot_order(order_proof):
         first_order_st = order_proof[0]
         return first_order_st[0], first_order_st[1]
-    
+
     # Retransmission ack from head to replica
-    def receive(msg=('retransmission_ack', order_id), from_ =replicas[0]):
-        if prev != None:
-            print('Received ack from head for retransmission, cancelling timeout')
-            logging.info("Received ack from head for retransmission, cancelling" +
-                         "timeout", extra=logger.NODE_INFO)
+    def receive(msg=('retransmission_ack', order_id), from_=replicas[0]):
+        if prev is not None:
+            print("Received ack from head for retransmission, ",
+                  "Cancelling timeout")
+            logging.info("Received ack from head for retransmission, " +
+                         "cancelling timeout", extra=logger.NODE_INFO)
 
     # Eventually head will deal with re-transmission from replicas
-    def receive(msg=('retransmission_to_head', client, client_no, replica, order_id, order,)):
+    def receive(msg=('retransmission_to_head', client, client_no, replica,
+                order_id, order,)):
 
-        if self.prev == None:
+        if self.prev is None:
             if client_no not in client_fwd_rqst_counter:
                 client_fwd_rqst_counter[client_no] = 0
             client_fwd_rqst_counter[client_no] += 1
@@ -245,46 +236,54 @@ class replica(process):
             logging.info("Retransmission request forwarded from replica" +
                          "......", extra=logger.NODE_INFO)
 
-            if order_id in cache and len(cache[order_id]) == 2:
-                send(('retransmission_result', cache[order_id], replica_no,), to = client)
+            if order_id in cache and len(cache[order_id]) is 2:
+                send(('retransmission_result', cache[order_id], replica_no,),
+                     to=client)
 
                 logging.info("Sending retransmission_ack ACK: {orderId: %s}",
                              str(order_id), extra=logger.NODE_INFO)
 
-                send(('retransmission_ack', order_id), to = replica)
+                send(('retransmission_ack', order_id), to=replica)
 
-            elif order_id in cache and len(cache[order_id]) == 1:
-                if await(len(cache[order_id]) == 2):
-                    send(('retransmission_result', cache[order_id], replica_no,), to = client)
-                    send(('retransmission_ack', order_id), to = replica)
+            elif order_id in cache and len(cache[order_id]) is 1:
+                if await(len(cache[order_id]) is 2):
+                    send(('retransmission_result', cache[order_id],
+                         replica_no,), to=client)
+                    send(('retransmission_ack', order_id), to=replica)
 
                 elif timeout(int(time_out) / 1000):
-                    handle_client_req_at_head(client, client_no, order_id, order)
-                    if await(len(cache[order_id]) == 2):
-                        send(('retransmission_result', cache[order_id], replica_no,), to = client)
-                        send(('retransmission_ack', order_id), to = replica)
+                    handle_client_req_at_head(client, client_no, order_id,
+                                              order)
+                    if await(len(cache[order_id]) is 2):
+                        send(('retransmission_result', cache[order_id],
+                              replica_no,), to=client)
+                        send(('retransmission_ack', order_id), to=replica)
 
                     elif timeout(int(time_out) / 1000):
                         print("Request of reconfiguration from head")
                         logging.info("Request of reconfiguration from head",
                                      extra=logger.NODE_INFO)
         else:
-            print('I am not the head to eventually deal with re transmission request')
+            print("Only head has to eventually deal with re transmission" +
+                  "request")
 
-    def handle_client_req_at_head(client, client_no, unique_order_ide, order_req):
+    def handle_client_req_at_head(client, client_no, unique_order_ide,
+                                  order_req):
         print("Forwarding order request to next : ", order_req)
         current_slot += 1
-        ## No need to verify order proof at head
+        # No need to verify order proof at head
         order_proofs = []
-        ## order proof is a list of tuples (slot, order, replica, [digtal signs of preceding])
+
+        # Order proof is a list of tuples (slot, order, replica, [digtal signs
+        # of preceding])
         order_proofs.append(create_order_proof(current_slot, order_req))
         result = command_executor.get_result(order_req, running_state)
-        if result != None:
+        if result is not None:
             cache[unique_order_ide] = [result]
             result_proof = []
             result_proof.append(create_result_proof(result, order_req))
-            send(('forward_shuttle', client, client_no, unique_order_ide, \
-                order_proofs, result_proof,), to = next_r)    
+            send(('forward_shuttle', client, client_no, unique_order_ide,
+                  order_proofs, result_proof,), to=next_r)
 
     def set_global_operation(order):
         global_operation = order
@@ -293,7 +292,7 @@ class replica(process):
         key = str(client_no) + "_" + str(replica_no)
         if key in injected_drop_result.keys():
             val = injected_drop_result[key]
-            if int(val) + 1 == int(msg_count):
+            if int(val) + 1 is int(msg_count):
                 return True
         return False
 
@@ -301,7 +300,7 @@ class replica(process):
         key = str(client_no) + "_" + str(replica_no)
         if key in injected_change_result.keys():
             val = injected_change_result[key]
-            if int(val) + 1 == int(msg_count):
+            if int(val) + 1 is int(msg_count):
                 return "OK"
         return None
 
@@ -309,10 +308,10 @@ class replica(process):
         key = str(client_no) + "_" + str(replica_no)
         if key in injected_get_operation.keys():
             val = injected_get_operation[key]
-            if int(val) + 1 == int(msg_count):
+            if int(val) + 1 is int(msg_count):
                 return "get('x')"
-        return global_operation 
-    
+        return global_operation
+
     def set_trigger_for_change_operation(client_no, msg_num, replica_no):
         key = str(client_no) + "_" + str(replica_no)
         injected_get_operation[key] = msg_num
@@ -329,140 +328,188 @@ class replica(process):
         key = str(client_no) + "_" + str(msg_count_by_client)
         if str(key) in client_shuttle_trigger:
             val = client_shuttle_trigger[key]
-            if val == "change_operation":
-                set_trigger_for_change_operation(client_no, msg_count_by_client, replica_no)
-            elif val == "change_result":
-                set_trigger_for_change_result(client_no, msg_count_by_client, replica_no)
-            elif val == "drop_result_stmt":
-                set_trigger_for_drop_result_stmt(client_no, msg_count_by_client, replica_no)
+            if val is "change_operation":
+                set_trigger_for_change_operation(client_no,
+                                                 msg_count_by_client,
+                                                 replica_no)
+            elif val is "change_result":
+                set_trigger_for_change_result(client_no, msg_count_by_client,
+                                              replica_no)
+            elif val is "drop_result_stmt":
+                set_trigger_for_drop_result_stmt(client_no,
+                                                 msg_count_by_client,
+                                                 replica_no)
 
-
-    # Only head is supposed to handle order request from client    
-    def receive(msg=('request_order', client, client_no, unique_order_ide, order_req,)):
-        if self.prev == None:
+    # Only head is supposed to handle order request from client
+    def receive(msg=('request_order', client, client_no, unique_order_ide,
+                     order_req,)):
+        if self.prev is None:
             if client_no not in client_shuttle_counter:
                 client_shuttle_counter[client_no] = 0
             client_shuttle_counter[client_no] += 1
-            ## Injected code ---- Start   
+            # Injected code ---- Start
             set_global_operation(order_req)
-            trigger_failure_injection_for_shuttle(client_no, client_shuttle_counter[client_no])
-            order = get_injected_operation(client_no, client_shuttle_counter[client_no], replica_no)
-            ## Injected code -----End        
-            handle_client_req_at_head(client, client_no, unique_order_ide, order)
+            trigger_failure_injection_for_shuttle(client_no,
+                                                  client_shuttle_counter
+                                                  [client_no])
+            order = get_injected_operation(client_no,
+                                           client_shuttle_counter[client_no],
+                                           replica_no)
+            # Injected code -----End
+            handle_client_req_at_head(client, client_no, unique_order_ide,
+                                      order)
         else:
-            print("I am not the head to take order request from client")
-
+            print("Only head must take order request from client")
 
     # Forward Shuttle to next
-    def receive(msg=('forward_shuttle', client, client_no, unique_order_ide, \
-         order_proofs, result_proofs, ), from_ = self.prev):
+    def receive(msg=('forward_shuttle', client, client_no, unique_order_ide,
+                     order_proofs, result_proofs, ), from_=self.prev):
         if client_no not in client_shuttle_counter:
             client_shuttle_counter[client_no] = 0
-            client_shuttle_counter[client_no] += 1
-        if self.next_r != None:
+        client_shuttle_counter[client_no] += 1
+        if self.next_r is not None:
             if is_valid_order_proofs(order_proofs):
                 current_slot, order_req = get_slot_order(order_proofs)
-                ## Injected code ----- Start
+                # Injected code ----- Start
                 set_global_operation(order_req)
-                trigger_failure_injection_for_shuttle(client_no, client_shuttle_counter[client_no])
-                order_req = get_injected_operation(client_no, client_shuttle_counter[client_no], replica_no)
-                ## Injected code ----- End
+                trigger_failure_injection_for_shuttle(client_no,
+                                                      client_shuttle_counter
+                                                      [client_no])
+                order_req = get_injected_operation(client_no,
+                                                   client_shuttle_counter
+                                                   [client_no], replica_no)
+                # Injected code ----- End
                 predecessor_order_proof = order_proofs[replica_no - 1][3]
-                order_proofs.append(combine_order_proof(current_slot, order_req, predecessor_order_proof))
+                order_proofs.append(combine_order_proof(current_slot,
+                                    order_req, predecessor_order_proof))
                 result = command_executor.get_result(order_req, running_state)
-                ## Injected code ----- Start
-                injected_result = get_injected_result(client_no, client_shuttle_counter[client_no], replica_no)
-                if injected_result != None:
+                # Injected code ----- Start
+                injected_result = get_injected_result(client_no,
+                                                      client_shuttle_counter
+                                                      [client_no], replica_no)
+                if injected_result is not None:
                     result = injected_result
-                ## Injected code ----- End
+                # Injected code ----- End
                 cache[unique_order_ide] = [result]
                 predecessor_results = result_proofs[replica_no - 1][2]
-                result_proofs.append(combine_result_proof(result, order_req, predecessor_results))
-                ## Injected code ----- Start
-                if get_injected_drop_stmt(client_no, client_shuttle_counter[client_no], replica_no):
+                result_proofs.append(combine_result_proof(result, order_req,
+                                     predecessor_results))
+                # Injected code ----- Start
+                if get_injected_drop_stmt(client_no,
+                                          client_shuttle_counter[client_no],
+                                          replica_no):
                     result_proofs = result_proofs[1:]
-                ## Injected code ----- End
-                send(('forward_shuttle', client, client_no, unique_order_ide, \
-                     order_proofs, result_proofs,), to = self.next_r)
-            ## else make reconfiguration call to olympus
+                # Injected code ----- End
+                send(('forward_shuttle', client, client_no, unique_order_ide,
+                     order_proofs, result_proofs,), to=self.next_r)
+            # else make reconfiguration call to olympus
         else:
-            print("I am the tail and sending to client")
+            print("Tail sending result to client")
             if is_valid_order_proofs(order_proofs):
                 current_slot, order_req = get_slot_order(order_proofs)
                 # Injected code ------ Start
                 set_global_operation(order_req)
-                trigger_failure_injection_for_shuttle(client_no, client_shuttle_counter[client_no])
-                order_req = get_injected_operation(client_no, client_shuttle_counter[client_no], replica_no)
+                trigger_failure_injection_for_shuttle(client_no,
+                                                      client_shuttle_counter
+                                                      [client_no])
+                order_req = get_injected_operation(client_no,
+                                                   client_shuttle_counter
+                                                   [client_no], replica_no)
                 result = command_executor.get_result(order_req, running_state)
-                injected_result = get_injected_result(client_no, client_shuttle_counter[client_no], replica_no)
-                if injected_result != None:
+                injected_result = get_injected_result(client_no,
+                                                      client_shuttle_counter
+                                                      [client_no], replica_no)
+                if injected_result is not None:
                     result = injected_result
                 # Injected code ------ End
                 predecessor_results = result_proofs[replica_no - 1][2]
-                result_proofs.append(combine_result_proof(result, order_req, predecessor_results))
+                result_proofs.append(combine_result_proof(result, order_req,
+                                     predecessor_results))
                 if is_valid_result_proof(result_proofs):
                     cache[unique_order_ide] = [result, result_proofs]
-                    ## Injection code ----- Start
-                    if get_injected_drop_stmt(client_no, client_shuttle_counter[client_no], replica_no):
+                    # Injection code ----- Start
+                    if get_injected_drop_stmt(client_no,
+                                              client_shuttle_counter
+                                              [client_no], replica_no):
                         result_proofs = result_proofs[1:]
-                    ## Injected code ------ End
-                    send(('result_proof', (result, result_proofs), self.replica_no, unique_order_ide), to = client)
+                    # Injected code ------ End
+                    send(('result_proof', (result, result_proofs),
+                          self.replica_no, unique_order_ide), to=client)
                     history.append(order_proofs)
                     print("sending result proof shuttle back")
-                    send(('result_shuttle', unique_order_ide, client_no, result_proofs,), to = self.prev)
+                    send(('result_shuttle', unique_order_ide, client_no,
+                          result_proofs,), to=self.prev)
                 else:
                     print("Result proof error so raise reconfiguration")
 
-    def trigger_failure_injection_for_result_shuttle(client_no, msg_count_by_client):
+    def trigger_failure_injection_for_result_shuttle(client_no,
+                                                     msg_count_by_client):
         key = str(client_no) + "_" + str(msg_count_by_client)
         if str(key) in client_result_shuttle_trigger:
             val = client_result_shuttle_trigger[key]
-            if val == "change_operation":
-                set_trigger_for_change_operation(client_no, msg_count_by_client, replica_no)
-            elif val == "change_result":
-                set_trigger_for_change_result(client_no, msg_count_by_client, replica_no)
-            elif val == "drop_result_stmt":
-                set_trigger_for_drop_result_stmt(client_no, msg_count_by_client, replica_no)
-    
-    
+            if val is "change_operation":
+                set_trigger_for_change_operation(client_no,
+                                                 msg_count_by_client,
+                                                 replica_no)
+            elif val is "change_result":
+                set_trigger_for_change_result(client_no, msg_count_by_client,
+                                              replica_no)
+            elif val is "drop_result_stmt":
+                set_trigger_for_drop_result_stmt(client_no,
+                                                 msg_count_by_client,
+                                                 replica_no)
+
     # Return Shuttle from next
-    def receive(msg=('result_shuttle', unique_order_ide, client_no, result_proof_pair,), from_ = self.next_r):
+    def receive(msg=('result_shuttle', unique_order_ide, client_no,
+                     result_proof_pair,), from_=self.next_r):
         if client_no not in client_result_shuttle_counter:
             client_result_shuttle_counter[client_no] = 0
         client_result_shuttle_counter[client_no] += 1
-        ## Injected code ---- Start   
-        trigger_failure_injection_for_shuttle(client_no, client_result_shuttle_counter[client_no])
-        ## Injected code -----End
+        # Injected code ---- Start
+        trigger_failure_injection_for_shuttle(client_no,
+                                              client_result_shuttle_counter
+                                              [client_no])
+        # Injected code -----End
         output("Received  result from next")
         result_with_proof = cache[unique_order_ide]
         result_with_proof.append(result_proof_pair)
         cache[unique_order_ide] = result_with_proof
         # Injected code ----------- Start
-        injected_result = get_injected_result(client_no, client_result_shuttle_counter[client_no], replica_no)
-        if injected_result != None:
+        injected_result = get_injected_result(client_no,
+                                              client_result_shuttle_counter
+                                              [client_no], replica_no)
+        if injected_result is not None:
             result_proofs = result_proof_pair[1]
             result_proof_pair = ("OK", result_proofs)
-        if get_injected_drop_stmt(client_no, client_result_shuttle_counter[client_no], replica_no):
+        if get_injected_drop_stmt(client_no,
+                                  client_result_shuttle_counter[client_no],
+                                  replica_no):
             result_proofs = result_proof_pair[1][1:]
             result_proof_pair = (result_proof_pair[0], result_proofs)
         # Injected code ------ End
-        if self.prev != None:
+        if self.prev is not None:
             print("Forwarding result proof to prev : ")
-            send(('result_shuttle', unique_order_ide, client_no, result_proof_pair,), to = self.prev)
+            send(('result_shuttle', unique_order_ide, client_no,
+                  result_proof_pair,), to=self.prev)
         else:
-            print("I am the Head and have received result proof shuttle")
+            print("Head received result proof shuttle")
 
-    def trigger_failure_injection_for_cl_dr_msg(client_no, msg_count_by_client):
+    def trigger_failure_injection_for_cl_dr_msg(client_no,
+                                                msg_count_by_client):
         key = str(client_no) + "_" + str(msg_count_by_client)
         if str(key) in client_direct_msg_trigger:
             val = client_direct_msg_trigger[key]
-            if val == "change_operation":
-                set_trigger_for_change_operation(client_no, msg_count_by_client, replica_no)
-            elif val == "change_result":
-                set_trigger_for_change_result(client_no, msg_count_by_client, replica_no)
-            elif val == "drop_result_stmt":
-                set_trigger_for_drop_result_stmt(client_no, msg_count_by_client, replica_no)
-
+            if val is "change_operation":
+                set_trigger_for_change_operation(client_no,
+                                                 msg_count_by_client,
+                                                 replica_no)
+            elif val is "change_result":
+                set_trigger_for_change_result(client_no, msg_count_by_client,
+                                              replica_no)
+            elif val is "drop_result_stmt":
+                set_trigger_for_drop_result_stmt(client_no,
+                                                 msg_count_by_client,
+                                                 replica_no)
 
     # Re-transmission from client
     def receive(msg=('retransmission', client, client_no, order_id, order,)):
@@ -472,23 +519,31 @@ class replica(process):
         print('Retrnsmission request received...... sending response')
         print("cache ", cache)
         set_global_operation(order)
-        trigger_failure_injection_for_shuttle(client_no, client_direct_msg_counter[client_no]) 
-        order_req = get_injected_operation(client_no, client_direct_msg_counter[client_no], replica_no)
-        if order_id in cache and len(cache[order_id]) == 2:
+        trigger_failure_injection_for_shuttle(client_no,
+                                              client_direct_msg_counter
+                                              [client_no])
+        order_req = get_injected_operation(client_no,
+                                           client_direct_msg_counter
+                                           [client_no], replica_no)
+        if order_id in cache and len(cache[order_id]) is 2:
             print('I have cashed value for order_id ', order_id, " ")
             result = cache[order_id][0]
             result_proofs = cache[order_id][1]
-            injected_result = get_injected_result(client_no, \
-                client_direct_msg_counter[client_no], replica_no)
-            if injected_result != None:
+            injected_result = get_injected_result(client_no,
+                                                  client_direct_msg_counter
+                                                  [client_no], replica_no)
+            if injected_result is not None:
                 result = "OK"
-            if get_injected_drop_stmt(client_no, client_direct_msg_counter[client_no], replica_no):
+            if get_injected_drop_stmt(client_no,
+                                      client_direct_msg_counter[client_no],
+                                      replica_no):
                 result_proofs = result_proofs[1][1:]
-            result_proof_pair = (result, result_proofs) 
-            send(('retransmission_result', result_proof_pair, replica_no,), to = client)
+            result_proof_pair = (result, result_proofs)
+            send(('retransmission_result', result_proof_pair, replica_no,),
+                 to=client)
         else:
-            send(('retransmission_to_head', client, client_no,  self, \
-                order_id, order_req,), to = replicas[0])
+            send(('retransmission_to_head', client, client_no,  self,
+                 order_id, order_req,), to=replicas[0])
             if await(received(('retransmission_ack', "=order_id",))):
                 print("Ack from head received, do nothing")
             elif timeout(int(time_out) / 1000):
@@ -499,4 +554,3 @@ class replica(process):
         set_failure_triggers()
         while True:
             await(received(('',)))
-
