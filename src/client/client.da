@@ -192,7 +192,7 @@ class client(process):
                          order, extra=logger.NODE_INFO)
             send(('request_order', self, client_no, request_id, order),
                  to=current_replicas[0])
-            if await(len(setof(a, received(('result_proof', _, _, _),
+            if await(len(setof(a, received(('result_proof', _, _, _request_id),
                      from_=a))) > 0):
                 pass
             elif timeout(int(time_out) / 1000):
