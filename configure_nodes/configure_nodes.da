@@ -16,8 +16,10 @@ replica = import_da('src.replicas.replica')
 olympus = import_da('src.olympus.olympus')
 client = import_da('src.client.client')
 
+
 def verify_key(sign_key):
     return sign_key.verify_key
+
 
 def main():
 
@@ -39,13 +41,13 @@ def main():
         config_file = sys.argv[1]
     else:
         logging.info("No configuration file is passed. Picking default" +
-                     ":/config/single_client_with_no_failure_with_workload.csv", extra=logger.NODE_INFO)
-    
+                     ":/config/single_client_with_no_failure_with_workload." +
+                     "csv", extra=logger.NODE_INFO)
+
     config(channel="reliable")
     config_values = config_parser.get_config(config_file)
     hosts = [each_host.strip() for each_host in
              config_values[config_parser.HOSTS].split(';')]
-
 
     olympus_host = hosts[int(config_values[olympus.HOST])]
     oly_name = 'OlympusNode'
@@ -55,11 +57,11 @@ def main():
     if olympus_host != 'localhost':
         oly_name += '@' + olympus_host
     oly = new(olympus.olympus, num=1, at=oly_name)
-    
+
     oly_signing_key = nacl.signing.SigningKey.generate()
     oly_verify_key = oly_signing_key.verify_key
 
-    #client_hosts = [int(cl_host) for cl_host in
+    # client_hosts = [int(cl_host) for cl_host in
     #                config_values[client.CLIENT_HOSTS].split(';')]
 
     # Initialize clients at respective hosts.
@@ -73,7 +75,6 @@ def main():
 
         # TODO: Right now only supporting localhost.
 
-        #host_name = hosts[client_hosts[client_no]]
         host_name = 'localhost'
         if host_name != 'localhost':
             node_name += '@' + host_name
@@ -106,8 +107,8 @@ def main():
         logging.info("Created replica- {Name: %s, Id: %s}",
                      replica_name[-1], replica_list[-1],
                      extra=logger.NODE_INFO)
-    
-    replica_verify_keys = list(map( verify_key, replica_signing_keys))    
+
+    replica_verify_keys = list(map(verify_key, replica_signing_keys))
 
     # After clients have been initialized, call setup on respective client
     # nodes
@@ -115,7 +116,8 @@ def main():
 
     for replica_no in range(0, num_of_replicas):
         setup(replica_list[replica_no], [config_file, replica_no, replica_list,
-                replica_name, oly, oly_verify_key, replica_verify_keys, replica_signing_keys[replica_no]])
+              replica_name, oly, oly_verify_key, replica_verify_keys,
+              replica_signing_keys[replica_no]])
         logging.info("Setting up replica- {Name: %s, Id: %s}",
                      replica_name[replica_no], replica_list[replica_no],
                      extra=logger.NODE_INFO)
@@ -126,12 +128,13 @@ def main():
 
     for client_no in range(0, int(config_values[client.NUM_OF_CLIENTS])):
         setup(client_list[client_no], [config_file, client_no, oly, oly_name,
-            client_name[client_no], client_list[client_no]])
+              client_name[client_no], client_list[client_no]])
         logging.info("Setting up client- {Name: %s, Id: %s}",
                      client_name[client_no], client_list[client_no],
                      extra=logger.NODE_INFO)
 
-    setup(oly, [config_file, replica_list, replica_name, oly_name, oly, oly_signing_key, replica_verify_keys])
+    setup(oly, [config_file, replica_list, replica_name, oly_name, oly,
+          oly_signing_key, replica_verify_keys])
     logging.info("Setting up olympus- {Name: %s, Id: %s}", oly_name,
                  oly, extra=logger.NODE_INFO)
 

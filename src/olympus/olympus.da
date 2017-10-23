@@ -15,8 +15,11 @@ HOST = 'olympus_host'
 
 
 class olympus(process):
+    """ An implementation to handle the singleton Olympus. """
 
-    def setup(config_file, replica_list, replica_name, name, nodeId, signing_key, replica_verify_keys):
+    def setup(config_file, replica_list, replica_name, name, nodeId,
+              signing_key, replica_verify_keys):
+        """ Setting up the Olympus based on configuration."""
 
         # Setting the logging format for the CONFIG_NODE
         # Default logging is INFO for CONFIG_NODE.
@@ -37,13 +40,15 @@ class olympus(process):
         return
 
     def receive(msg=('req_curr_config', client)):
+        """ Receives the CURRENT_CONFIG request from client. """
+
         logging.info("Received request CURRENT_CONFIG from %s",
                      str(client), extra=logger.NODE_INFO)
-        if client != None:
+        if client is not None:
             logging.info("Sending CURRENT_CONFIG to : %s", str(client),
                          extra=logger.NODE_INFO)
-
-            send(('rcv_curr_config', replica_list, replica_name, replica_verify_keys),to=client)
+            send(('rcv_curr_config', replica_list, replica_name,
+                  replica_verify_keys), to=client)
         else:
             logger.setLogFormatting(self.name + '.log',
                                     logger.getLogDir(), logging.ERROR)
@@ -51,9 +56,11 @@ class olympus(process):
                           extra=logger.INFO)
 
     def run():
-        logging.info("Running Olympus- {Name: %s, Id: %s",
-                     self.name, nodeId, extra=logger.NODE_INFO)
-        print("I am in olympus run waiting to serve request")
-        
+        """ Waits infinitely for serving any request.  """
+
+        logging.info("Running Olympus- {Name: %s, Id: %s}", self.name, nodeId,
+                     extra=logger.NODE_INFO)
+        print("Olympus running waiting to serve request !!! ")
+
         while True:
             await(received(('', )))
