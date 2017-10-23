@@ -1,13 +1,13 @@
-##############################################
-#                                            #
-#                  TEST CASE 1:              #
-#                  ===========               #
-# Single_client_with_change_operation_At_head                                            #
-##############################################
+###############################################
+#                                             #
+#                  TEST CASE 1:               #
+#                  ===========                #
+# Single_client_with_change_operation_At_head #
+###############################################
 
 	# Description:
       ===========
-      when change operation occurs at head, no other replica are able to
+      When change operation occurs at head, no other replica are able to
       identify misbehavior. Result proof finally reaches client where it
       identifies that the result is not same which it has asked for. Right now
       we are not retransmitting in this scenario but logging it.
@@ -15,13 +15,33 @@
 	# Configuration File:
       ==================
 
+      config/single_client_with_change_operation_failure_at_head.csv
+
 
 	# Commands:
       ========
 
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
+
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
 
 	# Log Files: 
       =========
+
+      logs_tar/single_client_with_change_operation_failure_at_head.tar.gz
 
 
 	# Programatic Check of Correctness:
@@ -29,39 +49,60 @@
       This was verified at client. Same operations were performed on dictionary
       and results were verified.
 
-	# Outcome:  PASS
+	# Outcome:  FAIL
       ========
 
 
-##############################################
-#                                            #
-#                  TEST CASE 2:              #
-#                  ===========               #
- Single client with changing operation failure at middle node.
-##############################################
+################################################################
+#                                                              #
+#                  TEST CASE 2:                                #
+#                  ===========                                 #
+# Single client with changing operation failure at middle node.#
+################################################################
 
 	# Description:
       ===========
-    In this case result proof validation at next replica which is tail will drop the message
-    This will cause timeout at client and retransmission requests are send to all replicas
-     . This time middle node will not change operation and hence client will get result proof.
+		In this case result proof validation at next replica which is tail will
+		drop the message. This will cause timeout at client and retransmission
+		requests are send to all replicas. This time middle node will not change
+        operation and hence client will get result proof.
+
 	# Configuration File:
       ==================
 
+     config/single_client_with_change_operation_failure_at_middle_node.csv
 
 	# Commands:
       ========
+
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
+
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
 
 
 	# Log Files: 
       =========
 
+     logs_tar/single_client_with_change_operation_failure_at_middle_node.tar.gz
 
 	# Programatic Check of Correctness:
       ================================
       We checked this from sequence of log messages in client and replicas.
 
-	# Outcome:  PASS
+	# Outcome:  FAIL
       ========
 
 ##############################################
@@ -69,7 +110,7 @@
 #                  TEST CASE 3:              #
 #                  ===========               #
 #                                            #
-# Single_client_with_change_operation_At_Tail                                            #
+# Single_client_with_change_operation_At_Tail#
 ##############################################
 
 	# Description:
@@ -80,20 +121,39 @@
 	# Configuration File:
       ==================
 
+      config/single_client_with_change_operation_failure_at_tail.csv
 
 	# Commands:
       ========
+
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
+
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
 
 
 	# Log Files: 
       =========
 
+      logs_tar/single_client_with_change_operation_failure_at_tail.tar.gz
 
 	# Programatic Check of Correctness:
       ================================
       This was verified from log files.
 
-	# Outcome:  PASS
+	# Outcome: FAIL 
       ========
 
 
@@ -112,20 +172,39 @@
 	# Configuration File:
       ==================
 
+      config/single_client_with_change_result_failure_at_tail.csv
 
 	# Commands:
       ========
 
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
+
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
+
+
 
 	# Log Files: 
       =========
-
+      logs_tar/single_client_with_change_result_failure_at_tail.tar.gz
 
 	# Programatic Check of Correctness:
       ================================
      Verified with local dictionary at client and log files.
 
-	# Outcome:  PASS
+	# Outcome:  FAIL
       ========
 
 
@@ -144,14 +223,34 @@
 	# Configuration File:
       ==================
 
+      config/single_client_with_no_failure_psedorandom_inputs.csv
 
 	# Commands:
       ========
+
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
+
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
+
 
 
 	# Log Files: 
       =========
 
+      logs_tar/single_client_with_no_failure_psedorandom_inputs.tar.gz
 
 	# Programatic Check of Correctness:
       ================================
@@ -177,21 +276,40 @@
 	# Configuration File:
       ==================
 
+      config/single_client_with_change_result_failure_at_middle.csv
 
 	# Commands:
       ========
 
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
+
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
+
+
 
 	# Log Files: 
       =========
-
+      logs_tar/single_client_with_change_result_failure_at_middle.tar.gz
 
 	# Programatic Check of Correctness:
       ================================
      By verifying the sequence of logs at replicas
      and clients.
 
-	# Outcome:  PASS
+	# Outcome: FAIL 
       ========
 
 ##############################################
@@ -209,13 +327,35 @@
 	# Configuration File:
       ==================
 
+      config/single_client_with_no_failure_psedorandom_with_workload.csv
 
 	# Commands:
       ========
 
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
+
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
+
+
+
 
 	# Log Files: 
       =========
+
+      logs_tar/single_client_with_no_failure_psedorandom_with_workload.tar.gz
 
 
 	# Programatic Check of Correctness:
@@ -241,13 +381,34 @@
 	# Configuration File:
       ==================
 
+      config/single_client_with_no_failure_with_unknown_operation.csv
 
 	# Commands:
       ========
 
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
+
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
 
 	# Log Files: 
       =========
+
+      logs_tar/single_client_with_no_failure_with_unknown_operation.tar.gz
+
+
 
 
 	# Programatic Check of Correctness:
@@ -256,7 +417,7 @@
     Thus client will continuosly send retrnsmission
     requests.
 
-	# Outcome:  PASS
+	# Outcome: FAIL 
       ========
 
 
@@ -269,23 +430,43 @@
 
 	# Description:
       ===========
-
+5 clients with 1000 operations per client was tested.
 
 	# Configuration File:
       ==================
 
+      config/multiple_client_with_no_failure_load_test_1000_operation.csv
 
 	# Commands:
       ========
+
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
+
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
+
 
 
 	# Log Files: 
       =========
 
+      logs_tar/multiple_client_with_no_failure_load_test_1000_operation.tar.gz
 
 	# Programatic Check of Correctness:
       ================================
-
+Log files were used to verify.
 
 	# Outcome:  PASS
       ========
@@ -300,24 +481,45 @@
 
 	# Description:
       ===========
-
+Single client with 1000 operations was tested.
 
 	# Configuration File:
       ==================
 
+      config/single_client_with_no_failure_load_test_1000_operation.csv
 
 	# Commands:
       ========
+
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
+
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
+
+
 
 
 	# Log Files: 
       =========
 
+      logs_tar/single_client_with_no_failure_load_test_1000_operation.tar.gz
 
 	# Programatic Check of Correctness:
       ================================
 
-
+Verification with dictionary at client.
 	# Outcome:  PASS
       ========
 
@@ -330,23 +532,44 @@
 
 	# Description:
       ===========
-
+Single client sending 100 operations was tested.
 
 	# Configuration File:
       ==================
+
+      config/single_client_with_no_failure_load_test_100_operation.csv.csv
 
 
 	# Commands:
       ========
 
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
+
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
+
+
 
 	# Log Files: 
       =========
-
+      
+      logs_tar/single_client_with_no_failure_load_test_100_operation.csv.tar.gz
 
 	# Programatic Check of Correctness:
       ================================
-
+Dictionary at client was used to verify result.
 
 	# Outcome:  PASS
       ========
@@ -365,14 +588,38 @@
 
 	# Configuration File:
       ==================
+      
+      config/single_client_with_no_failure_psedorandom_inputs_replica_count_5.csv
 
 
 	# Commands:
       ========
 
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
+
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
+
+
 
 	# Log Files: 
       =========
+      
+      logs_tar/single_client_with_no_failure_psedorandom_inputs_replica_count_5.tar.gz
+
+
 
 
 	# Programatic Check of Correctness:
@@ -392,23 +639,44 @@
 
 	# Description:
       ===========
-
+Psedorandom workload was run with 5 replicas. No failure was observed.
 
 	# Configuration File:
       ==================
+
+      config/single_client_with_no_failure_psedorandom_with_workload_replica_count_5.csv
 
 
 	# Commands:
       ========
 
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
+
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
+
+
 
 	# Log Files: 
       =========
+      logs_tar/single_client_with_no_failure_psedorandom_with_workload_replica_count_5.tar.gz
 
 
 	# Programatic Check of Correctness:
       ================================
-
+Was verified with dictonary at client.
 
 	# Outcome:  PASS
       ========
@@ -423,23 +691,44 @@
 
 	# Description:
       ===========
-
+This test was run with 5 replicas and no failure.
 
 	# Configuration File:
       ==================
+
+      config/single_client_with_no_failure_with_workload_replica_count_5.csv
 
 
 	# Commands:
       ========
 
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
+
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
+
+
 
 	# Log Files: 
       =========
+      logs_tar/single_client_with_no_failure_with_workload_replica_count_5.tar.gz
 
 
 	# Programatic Check of Correctness:
       ================================
-
+   dictionary at client was used to verify results.
 
 	# Outcome:  PASS
       ========
@@ -453,54 +742,47 @@
 
 	# Description:
       ===========
-
+      Replica executes all operations correctly
 
 	# Configuration File:
       ==================
+      
+      config/single_client_with_no_failure_with_workload.csv
 
 
 	# Commands:
       ========
 
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
 
-	# Log Files: 
-      =========
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
 
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
 
-	# Programatic Check of Correctness:
-      ================================
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
 
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
 
-	# Outcome:  PASS
-      ========
-
-
-##############################################
-#                                            #
-#                  TEST CASE 16:             #
-#                  ============              #
-#                                            #
-##############################################
-
-	# Description:
-      ===========
-
-
-	# Configuration File:
-      ==================
-
-
-	# Commands:
-      ========
 
 
 	# Log Files: 
       =========
+      
+      logs_tar/single_client_with_no_failure_with_workload.tar.gz
+
+
 
 
 	# Programatic Check of Correctness:
       ================================
-
+Since there is a single client, dictonary at client was used to verify.
 
 	# Outcome:  PASS
       ========
@@ -510,30 +792,52 @@
 #                                            #
 #                  TEST CASE 17:             #
 #                  ============              #
-#                                            #
+#Drop statement failure trigger at head                                           #
 ##############################################
 
 	# Description:
       ===========
-
+    When Head drops statements, it forwards shuttle without any order proof.
+    This is considered as misbehaviour and hence shuttle is dropped eventually
+    at tail. Client doesn't get reponse and retries again. This time it gets the value.
 
 	# Configuration File:
       ==================
 
+      config/single_client_with_drop_result_stmt_at_head.csv
 
 	# Commands:
       ========
+
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
+
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
+
 
 
 	# Log Files: 
       =========
 
+      logs_tar/single_client_with_drop_result_stmt_at_head.tar.gz
 
 	# Programatic Check of Correctness:
       ================================
+      This was verified by logging the sequence of operations.
 
-
-	# Outcome:  PASS
+	# Outcome:  FAIL
       ========
 
 
@@ -541,30 +845,53 @@
 #                                            #
 #                  TEST CASE 18:             #
 #                  ============              #
-#                                            #
+# Drop statement failure trigger at middle node                                           #
 ##############################################
 
 	# Description:
       ===========
+        When middle node drops result proof 
+        Same as the previous case. Tail drops result proof and client retries again.
+        This time client succeeds.
 
 
 	# Configuration File:
       ==================
 
+      config/single_client_with_drop_result_stmt_at_middle.csv
 
 	# Commands:
       ========
+
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
+
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
+
 
 
 	# Log Files: 
       =========
 
+      logs_tar/single_client_with_drop_result_stmt_at_middle.tar.gz
 
 	# Programatic Check of Correctness:
       ================================
 
 
-	# Outcome:  PASS
+	# Outcome:  FAIL
       ========
 
 
@@ -572,90 +899,50 @@
 #                                            #
 #                  TEST CASE 19:             #
 #                  ============              #
-#                                            #
+# Drop statement failure trigger at tail.                                           #
 ##############################################
 
 	# Description:
       ===========
-
+        In this case client finds out that the result is incorrect.
+        Right now we are not resending request from client for missing
+        result proofs.
 
 	# Configuration File:
       ==================
 
+      config/single_client_with_drop_result_stmt_at_tail.csv
 
 	# Commands:
       ========
+
+      python3 -m da  -n ConfigNode configure_nodes/configure_nodes.da        [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n OlympusNode configure_nodes/configure_nodes.da       [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ClientNode<num> configure_nodes/configure_nodes.da   [# Repective csv file]
+          config/*.csv 
+
+      python3 -m da  -n ReplicaNode<num> configure_nodes/configure_nodes.da  [# Repective csv file]
+          config/*.csv 
+
+      tar -xvzf *.tar.gz [ To open the tar files ]
+      
+      rm -rf logs/* [ For cleaning up the existing log files before opening
+                      another tar ]
+
 
 
 	# Log Files: 
       =========
 
+      logs_tar/single_client_with_drop_result_stmt_at_tail.tar.gz
 
 	# Programatic Check of Correctness:
       ================================
-
-
-	# Outcome:  PASS
+      Was verified with log files.
+    
+	# Outcome:  FAIL 
       ========
-
-##############################################
-#                                            #
-#                  TEST CASE 20:             #
-#                  ============              #
-#                                            #
-##############################################
-
-	# Description:
-      ===========
-
-
-	# Configuration File:
-      ==================
-
-
-	# Commands:
-      ========
-
-
-	# Log Files: 
-      =========
-
-
-	# Programatic Check of Correctness:
-      ================================
-
-
-	# Outcome:  PASS
-      ========
-
-
-##############################################
-#                                            #
-#                  TEST CASE 21:             #
-#                  ============              #
-#                                            #
-##############################################
-
-	# Description:
-      ===========
-
-
-	# Configuration File:
-      ==================
-
-
-	# Commands:
-      ========
-
-
-	# Log Files: 
-      =========
-
-
-	# Programatic Check of Correctness:
-      ================================
-
-
-	# Outcome:  PASS
-      ========
-
