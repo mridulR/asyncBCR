@@ -54,7 +54,7 @@ class replica(process):
 
         # Update next and previous replica by each replica
         self.num_of_replicas = len(replicas)
-        if replica_no is 0:
+        if replica_no == 0:
             self.prev = None
             self.me = replicas[0]
             self.next_r = replicas[1]
@@ -70,7 +70,7 @@ class replica(process):
                          replicas[replica_no], replicas_name[replica_no],
                          olympus, extra=logger.NODE_INFO)
 
-        elif replica_no is len(replicas) - 1:
+        elif replica_no == len(replicas) - 1:
             self.prev = replicas[replica_no - 1]
             self.me = replicas[replica_no]
             self.next_r = None
@@ -108,7 +108,7 @@ class replica(process):
         self.head_time_out = config[HEAD_TIMEOUT]
         self.non_head_time_out = config[NON_HEAD_TIMEOUT]
 
-        if prev is None:
+        if prev == None:
             self.time_out = head_time_out
             logging.info("HEAD timeout value- %s", str(head_time_out),
                          extra=logger.NODE_INFO)
@@ -127,7 +127,7 @@ class replica(process):
                 replica = int(config_replica.group(2))
 
                 # In phase 2 only concerned with config 0
-                if config is 0 and replica is replica_no:
+                if config == 0 and replica == replica_no:
                     trigger_failures = [each.strip() for each in value.split(';')]
                     for trigg_fail in trigger_failures:
                         if trigg_fail.startswith("client_request"):
@@ -146,6 +146,7 @@ class replica(process):
                             cli_msg = re.search(r'result_shuttle\((.*?),(.*?)\),(.*?)\(\)', trigg_fail)
                             key = cli_msg.group(1) + "_" + cli_msg.group(2)
                             client_result_shuttle_trigger[key] = cli_msg.group(3).strip()
+    return
 
     def combine_result_proof(result, order, predecessor_results):
         msg = 16 * str.encode(result)
@@ -181,7 +182,7 @@ class replica(process):
             result_proof = result_proofs[ind]
             pred_result = result_proof[0]
             pred_order = result_proof[1]
-            if result is not pred_result or order is not pred_order:
+            if result != pred_result or order != pred_order:
                 return False
             for sec in range(0, ind + 1):
                 verify_key = replica_verify_keys[sec]
@@ -202,7 +203,7 @@ class replica(process):
             order_proof = order_proofs[ind]
             pred_slot = order_proof[0]
             pred_order = order_proof[1]
-            if slot is not pred_slot or order is not pred_order:
+            if slot != pred_slot or order != pred_order:
                 return False
             for sec in range(0, ind + 1):
                 verify_key = replica_verify_keys[sec]
@@ -218,7 +219,7 @@ class replica(process):
 
     # Retransmission ack from head to replica
     def receive(msg=('retransmission_ack', order_id), from_=replicas[0]):
-        if prev is not None:
+        if prev != None:
             print("Received ack from head for retransmission, ",
                   "Cancelling timeout")
             logging.info("Received ack from head for retransmission, " +
@@ -228,7 +229,7 @@ class replica(process):
     def receive(msg=('retransmission_to_head', client, client_no, replica,
                 order_id, order,)):
 
-        if self.prev is None:
+        if self.prev == None:
             if client_no not in client_fwd_rqst_counter:
                 client_fwd_rqst_counter[client_no] = 0
             client_fwd_rqst_counter[client_no] += 1
@@ -236,7 +237,7 @@ class replica(process):
             logging.info("Retransmission request forwarded from replica" +
                          "......", extra=logger.NODE_INFO)
 
-            if order_id in cache and len(cache[order_id]) is 2:
+            if order_id in cache and len(cache[order_id]) == 2:
                 send(('retransmission_result', cache[order_id], replica_no,),
                      to=client)
 
@@ -245,8 +246,8 @@ class replica(process):
 
                 send(('retransmission_ack', order_id), to=replica)
 
-            elif order_id in cache and len(cache[order_id]) is 1:
-                if await(len(cache[order_id]) is 2):
+            elif order_id in cache and len(cache[order_id]) == 1:
+                if await(len(cache[order_id]) == 2):
                     send(('retransmission_result', cache[order_id],
                          replica_no,), to=client)
                     send(('retransmission_ack', order_id), to=replica)
@@ -254,7 +255,7 @@ class replica(process):
                 elif timeout(int(time_out) / 1000):
                     handle_client_req_at_head(client, client_no, order_id,
                                               order)
-                    if await(len(cache[order_id]) is 2):
+                    if await(len(cache[order_id]) == 2):
                         send(('retransmission_result', cache[order_id],
                               replica_no,), to=client)
                         send(('retransmission_ack', order_id), to=replica)
@@ -278,7 +279,7 @@ class replica(process):
         # of preceding])
         order_proofs.append(create_order_proof(current_slot, order_req))
         result = command_executor.get_result(order_req, running_state)
-        if result is not None:
+        if result != None:
             cache[unique_order_ide] = [result]
             result_proof = []
             result_proof.append(create_result_proof(result, order_req))
@@ -292,7 +293,7 @@ class replica(process):
         key = str(client_no) + "_" + str(replica_no)
         if key in injected_drop_result.keys():
             val = injected_drop_result[key]
-            if int(val) + 1 is int(msg_count):
+            if int(val) + 1 == int(msg_count):
                 return True
         return False
 
@@ -300,7 +301,7 @@ class replica(process):
         key = str(client_no) + "_" + str(replica_no)
         if key in injected_change_result.keys():
             val = injected_change_result[key]
-            if int(val) + 1 is int(msg_count):
+            if int(val) + 1 == int(msg_count):
                 return "OK"
         return None
 
@@ -308,7 +309,7 @@ class replica(process):
         key = str(client_no) + "_" + str(replica_no)
         if key in injected_get_operation.keys():
             val = injected_get_operation[key]
-            if int(val) + 1 is int(msg_count):
+            if int(val) + 1 == int(msg_count):
                 return "get('x')"
         return global_operation
 
@@ -328,14 +329,14 @@ class replica(process):
         key = str(client_no) + "_" + str(msg_count_by_client)
         if str(key) in client_shuttle_trigger:
             val = client_shuttle_trigger[key]
-            if val is "change_operation":
+            if val == "change_operation":
                 set_trigger_for_change_operation(client_no,
                                                  msg_count_by_client,
                                                  replica_no)
-            elif val is "change_result":
+            elif val == "change_result":
                 set_trigger_for_change_result(client_no, msg_count_by_client,
                                               replica_no)
-            elif val is "drop_result_stmt":
+            elif val == "drop_result_stmt":
                 set_trigger_for_drop_result_stmt(client_no,
                                                  msg_count_by_client,
                                                  replica_no)
@@ -343,7 +344,7 @@ class replica(process):
     # Only head is supposed to handle order request from client
     def receive(msg=('request_order', client, client_no, unique_order_ide,
                      order_req,)):
-        if self.prev is None:
+        if self.prev == None:
             if client_no not in client_shuttle_counter:
                 client_shuttle_counter[client_no] = 0
             client_shuttle_counter[client_no] += 1
@@ -367,7 +368,7 @@ class replica(process):
         if client_no not in client_shuttle_counter:
             client_shuttle_counter[client_no] = 0
         client_shuttle_counter[client_no] += 1
-        if self.next_r is not None:
+        if self.next_r != None:
             if is_valid_order_proofs(order_proofs):
                 current_slot, order_req = get_slot_order(order_proofs)
                 # Injected code ----- Start
@@ -387,7 +388,7 @@ class replica(process):
                 injected_result = get_injected_result(client_no,
                                                       client_shuttle_counter
                                                       [client_no], replica_no)
-                if injected_result is not None:
+                if injected_result != None:
                     result = injected_result
                 # Injected code ----- End
                 cache[unique_order_ide] = [result]
@@ -419,7 +420,7 @@ class replica(process):
                 injected_result = get_injected_result(client_no,
                                                       client_shuttle_counter
                                                       [client_no], replica_no)
-                if injected_result is not None:
+                if injected_result != None:
                     result = injected_result
                 # Injected code ------ End
                 predecessor_results = result_proofs[replica_no - 1][2]
@@ -447,14 +448,14 @@ class replica(process):
         key = str(client_no) + "_" + str(msg_count_by_client)
         if str(key) in client_result_shuttle_trigger:
             val = client_result_shuttle_trigger[key]
-            if val is "change_operation":
+            if val == "change_operation":
                 set_trigger_for_change_operation(client_no,
                                                  msg_count_by_client,
                                                  replica_no)
-            elif val is "change_result":
+            elif val == "change_result":
                 set_trigger_for_change_result(client_no, msg_count_by_client,
                                               replica_no)
-            elif val is "drop_result_stmt":
+            elif val == "drop_result_stmt":
                 set_trigger_for_drop_result_stmt(client_no,
                                                  msg_count_by_client,
                                                  replica_no)
@@ -478,7 +479,7 @@ class replica(process):
         injected_result = get_injected_result(client_no,
                                               client_result_shuttle_counter
                                               [client_no], replica_no)
-        if injected_result is not None:
+        if injected_result != None:
             result_proofs = result_proof_pair[1]
             result_proof_pair = ("OK", result_proofs)
         if get_injected_drop_stmt(client_no,
@@ -487,7 +488,7 @@ class replica(process):
             result_proofs = result_proof_pair[1][1:]
             result_proof_pair = (result_proof_pair[0], result_proofs)
         # Injected code ------ End
-        if self.prev is not None:
+        if self.prev != None:
             print("Forwarding result proof to prev : ")
             send(('result_shuttle', unique_order_ide, client_no,
                   result_proof_pair,), to=self.prev)
@@ -499,14 +500,14 @@ class replica(process):
         key = str(client_no) + "_" + str(msg_count_by_client)
         if str(key) in client_direct_msg_trigger:
             val = client_direct_msg_trigger[key]
-            if val is "change_operation":
+            if val == "change_operation":
                 set_trigger_for_change_operation(client_no,
                                                  msg_count_by_client,
                                                  replica_no)
-            elif val is "change_result":
+            elif val == "change_result":
                 set_trigger_for_change_result(client_no, msg_count_by_client,
                                               replica_no)
-            elif val is "drop_result_stmt":
+            elif val == "drop_result_stmt":
                 set_trigger_for_drop_result_stmt(client_no,
                                                  msg_count_by_client,
                                                  replica_no)
@@ -532,7 +533,7 @@ class replica(process):
             injected_result = get_injected_result(client_no,
                                                   client_direct_msg_counter
                                                   [client_no], replica_no)
-            if injected_result is not None:
+            if injected_result != None:
                 result = "OK"
             if get_injected_drop_stmt(client_no,
                                       client_direct_msg_counter[client_no],
