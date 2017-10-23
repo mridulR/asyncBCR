@@ -65,10 +65,10 @@ class replica(process):
             logger.setLogNodeInfo(self, replicas_name[replica_no])
 
             # Log the received values
-            logging.info("HEAD received setup - config_file: %s replica_list" +
-                         ":%s replica_name: %s olympus: {Id: %s}", config_file,
-                         replicas[replica_no], replicas_name[replica_no],
-                         olympus, extra=logger.NODE_INFO)
+            logging.info("HEAD received setup: { Config_file: %s," +
+                         "Replicas_list: %s Replicas_name: %s, Olympus: %s }",
+                         config_file, replicas, replicas_name, olympus,
+                         extra=logger.NODE_INFO)
 
         elif replica_no == len(replicas) - 1:
             self.prev = replicas[replica_no - 1]
@@ -81,10 +81,10 @@ class replica(process):
             logger.setLogNodeInfo(self, replicas_name[replica_no])
 
             # Log the received values
-            logging.info("TAIL received setup - config_file: %s replica_list" +
-                         ":%s replica_name: %s olympus: {Id: %s}", config_file,
-                         replicas[replica_no], replicas_name[replica_no],
-                         olympus, extra=logger.NODE_INFO)
+            logging.info("TAIL received setup: { Config_file: %s," +
+                         "Replicas_list: %s Replicas_name: %s, Olympus: %s }",
+                         config_file, replicas, replicas_name, olympus,
+                         extra=logger.NODE_INFO)
 
         else:
             self.prev = replicas[replica_no - 1]
@@ -97,10 +97,9 @@ class replica(process):
             logger.setLogNodeInfo(self, replicas_name[replica_no])
 
             # Log the received values
-            logging.info("Replica received setup - config_file: %s " +
-                         "replica_list: %s replica_name: %s olympus: {Id: %s}",
-                         config_file, replicas[replica_no],
-                         replicas_name[replica_no], olympus,
+            logging.info("Replica received setup: { Config_file: %s," +
+                         "Replicas_list: %s Replicas_name: %s, Olympus: %s }",
+                         config_file, replicas, replicas_name, olympus,
                          extra=logger.NODE_INFO)
 
         # Setting timeout for replica head and non-head
@@ -110,15 +109,18 @@ class replica(process):
 
         if prev == None:
             self.time_out = head_time_out
-            logging.info("HEAD timeout value- %s", str(head_time_out),
+            logging.info("HEAD timeout value: %s ms", str(head_time_out),
                          extra=logger.NODE_INFO)
         else:
             self.time_out = non_head_time_out
-            logging.info("Replica timeout value- %s", str(non_head_time_out),
-                         extra=logger.NODE_INFO)
+            logging.info("Replica timeout value: %s ms",
+                         str(non_head_time_out), extra=logger.NODE_INFO)
         return
 
     def set_failure_triggers():
+        """ Setting up the injection point for each replica after reading the
+            configuration from the config file.based on configuration. """
+
         for key, value in config.items():
             trigger_failure_list = []
             if key.startswith('failures'):
@@ -149,6 +151,11 @@ class replica(process):
     return
 
     def combine_result_proof(result, order, predecessor_results):
+        """ Updates the result_proof with it's own sign key on top of the
+            predecessor's (the one before in the chain) result_proof. It hashes
+            the result before signing and then only sends the result_proof
+            over a shuttle in forward/backward direction. """
+
         msg = 16 * str.encode(result)
         digest = HASHER(msg, encoder=nacl.encoding.HexEncoder)
         signed = sign_key.sign(digest)
@@ -156,25 +163,55 @@ class replica(process):
         return (result, order, predecessor_results)
 
     def combine_order_proof(slot_no, order_string, predecessor_orders):
+        """ Updates the order_proof received from predesessor replica, with
+            it's own sign key on top of it and then sends the order_proof. A
+            predecessor is the replica that comes immediately before it, in the
+            chain. """
+
         tup = (str(slot_no), order_string, str(replica_no))
         signed = sign_key.sign(str.encode(str(tup)))
         predecessor_orders.append(signed)
         return (slot_no, order_string, replica_no, predecessor_orders)
 
     def create_order_proof(slot_no, order_string):
+        """ HEAD replica creates the order_proof which is forwarded alongwith
+            shuttle to the next replica in chain. Other replica's append their
+            order_proof to this and send along the chain. The tail replica
+            sends the order_proof on shuttle along the chain in opposite
+            direction. """
+
         tup = (str(slot_no), order_string, str(replica_no))
         signed = sign_key.sign(str.encode(str(tup)))
         predecessor_order_proofs = [signed]
         return (slot_no, order_string, replica_no, predecessor_order_proofs)
 
     def create_result_proof(result, order):
+        """ HEAD replica creates the result_proof which is forwarded alongwith
+            shuttle to the next replica in chain. Other replica's append their
+            result_proof to this and send along the chain. The tail replica
+            sends the result_proof on shuttle along the chain in opposite
+            direction as well as to the client. """
+
         msg = 16 * str.encode(result)
         digest = HASHER(msg, encoder=nacl.encoding.HexEncoder)
         signed = sign_key.sign(digest)
         return (result, order, [signed])
 
     def is_valid_result_proof(result_proofs):
+        """ Validates if the result_proof is correct or not.
+               -If the result doesn't match the predecessor replica's result
+                then returns false.
+               -If the order is not present in the predecessor's order.
+                then returns false.
+               -If the sign verification of the result_proof with predecessor
+                replica's verify key fails, then return false. is not present
+                in the predecessor's order then returns false.
+               -If the result proof size is zero then return false.
+               -otherwise return TRUE. """
+
         if len(result_proofs) < 1:
+            logging.error("MISBEHAVIOUR: Empty Result Proof ",
+                          extra=logger.NODE_INFO)
             return False
         result = result_proofs[0][0]
         order = result_proofs[0][1]
@@ -183,42 +220,78 @@ class replica(process):
             pred_result = result_proof[0]
             pred_order = result_proof[1]
             if result != pred_result or order != pred_order:
+                logging.error("MISBEHAVIOUR: Conflicting result or OrderNo " +
+                              "does not match. {Result: %s, OrderNo: %s}" +
+                              "{Predecessor Replica Result: %s ," +
+                              "Predecessor Replica OrderNo: %s}", result,
+                              order, pred_result, pred_order,
+                              extra=logger.NODE_INFO)
                 return False
             for sec in range(0, ind + 1):
                 verify_key = replica_verify_keys[sec]
                 try:
                     verify_key.verify(result_proof[2][sec])
                 except nacl.exceptions.BadSignatureError:
+                    logging.error("MISBEHAVIOUR: Bad signature error in " +
+                                  "Result Proof", extra=logger.NODE_INFO)
+
                     return False
         return True
 
     def is_valid_order_proofs(order_proofs):
+        """ Validates if the order_proof is correct or not.
+              -If the slot is not present in the predecessor replica's slot
+               then returns false.
+              -If the order is not present in the predecessor's order.
+               then returns false.
+              -If the sign verification of the order_proof with predecessor
+               replica's verify key fails, then return false.
+               -If the order proof size is zero then return false.
+              -otherwise TRUE. """
+
         if len(order_proofs) < 1:
+            logging.error("MISBEHAVIOUR: Empty Order Proof ",
+                          extra=logger.NODE_INFO)
             return False
         slot = order_proofs[0][0]
         order = order_proofs[0][1]
         if slot in cache:
+            logging.error("MISBEHAVIOUR: Conflicting slot. Slot already " +
+                          "present in cache. {SlotNo: %s}", slot,
+                          extra=logger.NODE_INFO)
             return False
         for ind in range(0, replica_no):
             order_proof = order_proofs[ind]
             pred_slot = order_proof[0]
             pred_order = order_proof[1]
             if slot != pred_slot or order != pred_order:
+                logging.error("MISBEHAVIOUR: Unknown slot or OrderNo not " +
+                              "present in Order_Proof. {SlotNo: %s, OrderNo:" +
+                              " %s} {Predecessor Replica Slot No: %s ," +
+                              "Predecessor Replica Order No: %s}", slot, order,
+                              pred_slot, pred_order, extra=logger.NODE_INFO)
                 return False
             for sec in range(0, ind + 1):
                 verify_key = replica_verify_keys[sec]
                 try:
                     verify_key.verify(order_proof[3][sec])
                 except nacl.exceptions.BadSignatureError:
+                    logging.error("MISBEHAVIOUR: Bad signature error in " +
+                                  "Order Proof", extra=logger.NODE_INFO)
+
                     return False
         return True
 
     def get_slot_order(order_proof):
+        """ Fetches the slot from the first verified order_proof. """
         first_order_st = order_proof[0]
         return first_order_st[0], first_order_st[1]
 
     # Retransmission ack from head to replica
     def receive(msg=('retransmission_ack', order_id), from_=replicas[0]):
+        """ Receives the retransmission acknowledgement from the HEAD to cancel
+            the timeout of itself. """
+
         if prev != None:
             print("Received ack from head for retransmission, ",
                   "Cancelling timeout")
@@ -228,6 +301,11 @@ class replica(process):
     # Eventually head will deal with re-transmission from replicas
     def receive(msg=('retransmission_to_head', client, client_no, replica,
                 order_id, order,)):
+        """ Receives the retransmission message from the CLIENT. If the result
+            is not present in the cache then it will forward the request to the
+            HEAD to handle it. It also starts a time waiting for HEAD's ACK. If
+            the acknowledgement is not received then then trigger
+            reconfiguration to olympus. """
 
         if self.prev == None:
             if client_no not in client_fwd_rqst_counter:
@@ -270,6 +348,10 @@ class replica(process):
 
     def handle_client_req_at_head(client, client_no, unique_order_ide,
                                   order_req):
+        """ Handles the client order request. It assigns a slot to order and
+            then create the order_proof and result_proof which is forwarded
+            along the chain. """
+
         print("Forwarding order request to next : ", order_req)
         current_slot += 1
         # No need to verify order proof at head
@@ -286,8 +368,18 @@ class replica(process):
             cache[unique_order_ide] = [result]
             result_proof = []
             result_proof.append(create_result_proof(result, order_req))
-            if get_injected_drop_stmt(client_no, client_shuttle_counter[client_no]):
+
+            if get_injected_drop_stmt(client_no, 
+                                      client_shuttle_counter[client_no]):
                 result_proof = []
+
+            logging.info("HEAD sending FORWARD_SHUTTLE to next replica in " +
+                         "chain. { OrderNo: %s, OrderRequest: %s, " +
+                         "NextReplicaName: %s ClientNo: %s, RESULT: %s }",
+                         unique_order_ide, str(order_req),
+                         replicas_name[int(replica_no)+1], str(client_no),
+                         result, extra=logger.NODE_INFO)
+
             send(('forward_shuttle', client, client_no, unique_order_ide,
                   order_proofs, result_proof,), to=next_r)
 
@@ -346,6 +438,11 @@ class replica(process):
     def receive(msg=('request_order', client, client_no, unique_order_ide,
                      order_req,)):
         if self.prev == None:
+            logging.info("HEAD received ORDER_REQUEST from client. { OrderNo" +
+                         ": %s, OrderRequest: %s, ClientNo: %s }",
+                         unique_order_ide, str(order_req), str(client_no),
+                         extra=logger.NODE_INFO)
+
             if client_no not in client_shuttle_counter:
                 client_shuttle_counter[client_no] = 0
             client_shuttle_counter[client_no] += 1
@@ -360,11 +457,21 @@ class replica(process):
             handle_client_req_at_head(client, client_no, unique_order_ide,
                                       order)
         else:
-            print("Only head must take order request from client")
+
+            logging.info("Only HEAD must take order request from client",
+                         extra=logger.NODE_INFO)
+        return
 
     # Forward Shuttle to next
     def receive(msg=('forward_shuttle', client, client_no, unique_order_ide,
                      order_proofs, result_proofs, ), from_=self.prev):
+
+        logging.info("Received FORWARD_SHUTTLE from previous replica in " +
+                     "chain. { OrderNo: %s, OrderRequest: %s ClientNo: %s " +
+                     " PreviousReplicaName: %s", unique_order_ide,
+                     order_proofs[0][1], str(client_no),
+                     replicas_name[int(replica_no)-1], extra=logger.NODE_INFO)
+
         if self.next_r != None:
             if client_no not in client_shuttle_counter:
                 client_shuttle_counter[client_no] = 0
@@ -376,14 +483,17 @@ class replica(process):
                 trigger_failure_injection_for_shuttle(client_no,
                                                       client_shuttle_counter
                                                       [client_no])
+
                 order_req = get_injected_operation(client_no,
                                                    client_shuttle_counter
                                                    [client_no])
                 # Injected code ----- End
+
                 predecessor_order_proof = order_proofs[replica_no - 1][3]
                 order_proofs.append(combine_order_proof(current_slot,
                                     order_req, predecessor_order_proof))
                 result = command_executor.get_result(order_req, running_state)
+
                 # Injected code ----- Start
                 injected_result = get_injected_result(client_no,
                                                       client_shuttle_counter
@@ -391,23 +501,34 @@ class replica(process):
                 if injected_result != None:
                     result = injected_result
                 # Injected code ----- End
+
                 cache[unique_order_ide] = [result]
                 predecessor_results = result_proofs[replica_no - 1][2]
                 result_proofs.append(combine_result_proof(result, order_req,
                                      predecessor_results))
+
                 # Injected code ----- Start
                 if get_injected_drop_stmt(client_no,
                                           client_shuttle_counter[client_no]):
                     result_proofs = result_proofs[1:]
                 # Injected code ----- End
+
+                logging.info("Sending FORWARD_SHUTTLE to next replica in " +
+                             "chain. {OrderNo: %s, OrderRequest: %s ClientNo" +
+                             ":%s NextReplicaName: %s }", unique_order_ide,
+                             order_proofs[0][1], str(client_no),
+                             replicas_name[int(replica_no)+1],
+                             extra=logger.NODE_INFO)
                 send(('forward_shuttle', client, client_no, unique_order_ide,
                      order_proofs, result_proofs,), to=self.next_r)
             # else make reconfiguration call to olympus
         else:
+
             if client_no not in client_shuttle_counter:
                 client_shuttle_counter[client_no] = 0
             client_shuttle_counter[client_no] += 1
             print("Tail sending result to client")
+
             if is_valid_order_proofs(order_proofs):
                 current_slot, order_req = get_slot_order(order_proofs)
                 # Injected code ------ Start
@@ -415,9 +536,11 @@ class replica(process):
                 trigger_failure_injection_for_shuttle(client_no,
                                                       client_shuttle_counter
                                                       [client_no])
+
                 order_req = get_injected_operation(client_no,
                                                    client_shuttle_counter
                                                    [client_no])
+
                 result = command_executor.get_result(order_req, running_state)
                 injected_result = get_injected_result(client_no,
                                                       client_shuttle_counter
@@ -436,10 +559,27 @@ class replica(process):
                                               [client_no]):
                         result_proofs = result_proofs[1:]
                     # Injected code ------ End
+
+                    logging.info("Sending RESULT_PROOF to Client. { OrderNo:" +
+                                 " %s, OrderRequest: %s Result: %s ClientNo:" +
+                                 " %s }", unique_order_ide, order_proofs[0][1],
+                                 result, str(client_no),
+                                 extra=logger.NODE_INFO)
+
                     send(('result_proof', (result, result_proofs),
                           self.replica_no, unique_order_ide), to=client)
                     history.append(order_proofs)
                     print("sending result proof shuttle back")
+
+                    logging.info("Sending REVERSE_SHUTTLE to previous " +
+                                 "replica in chain. { OrderNo: %s, " +
+                                 "OrderRequest: %s Result: %s ClientNo: " +
+                                 "%s PreviousReplicaName: %s }",
+                                 unique_order_ide, order_proofs[0][1], result,
+                                 str(client_no),
+                                 replicas_name[int(replica_no)-1],
+                                 extra=logger.NODE_INFO)
+
                     send(('result_shuttle', unique_order_ide, client_no,
                           result_proofs,), to=self.prev)
                 else:
@@ -451,17 +591,32 @@ class replica(process):
         if str(key) in client_result_shuttle_trigger:
             val = client_result_shuttle_trigger[key]
             if val == "change_operation":
+
+                logging.info("Injected change_operation",
+                             extra=logger.NODE_INFO)
                 set_trigger_for_change_operation(client_no,
                                                  msg_count_by_client)
             elif val == "change_result":
+
                 set_trigger_for_change_result(client_no, msg_count_by_client)
+                logging.info("Injected change_result", extra=logger.NODE_INFO)
+
             elif val == "drop_result_stmt":
+
+                logging.info("Injected drop_result_statement",
+                             extra=logger.NODE_INFO)
                 set_trigger_for_drop_result_stmt(client_no,
                                                  msg_count_by_client)
 
     # Return Shuttle from next
     def receive(msg=('result_shuttle', unique_order_ide, client_no,
                      result_proof_pair,), from_=self.next_r):
+        if self.next_r != None:
+            logging.info("Received REVERSE_SHUTTLE from next replica in " +
+                         "chain. { OrderNo: %s, ClientNo: %s Result: %s}",
+                         str(unique_order_ide), str(client_no),
+                         result_proof_pair[0][0], extra=logger.NODE_INFO)
+
         if client_no not in client_result_shuttle_counter:
             client_result_shuttle_counter[client_no] = 0
         client_result_shuttle_counter[client_no] += 1
@@ -487,11 +642,14 @@ class replica(process):
             result_proof_pair = (result_proof_pair[0], result_proofs)
         # Injected code ------ End
         if self.prev != None:
-            print("Forwarding result proof to prev : ")
+            logging.info("Sending REVERSE_SHUTTLE to previous replica in " +
+                         "chain. { OrderNo: %s, ClientNo: %s Result: %s }",
+                         str(unique_order_ide), str(client_no),
+                         result_proof_pair[0][0], extra=logger.NODE_INFO)
+
             send(('result_shuttle', unique_order_ide, client_no,
                   result_proof_pair,), to=self.prev)
-        else:
-            print("Head received result proof shuttle")
+        return
 
     def trigger_failure_injection_for_cl_dr_msg(client_no,
                                                 msg_count_by_client):
@@ -509,6 +667,12 @@ class replica(process):
 
     # Re-transmission from client
     def receive(msg=('retransmission', client, client_no, order_id, order,)):
+
+        logging.info("Received retransmission request from Client. {OrderNo:" +
+                     "%s, Order: %s, ClientNo: %s, ClientId: %s}",
+                     str(order_id), str(order), str(client_no), str(client),
+                     extra=logger.NODE_INFO)
+
         if client_no not in client_direct_msg_counter:
             client_direct_msg_counter[client_no] = 0
         client_direct_msg_counter[client_no] += 1
@@ -521,8 +685,10 @@ class replica(process):
         order_req = get_injected_operation(client_no,
                                            client_direct_msg_counter
                                            [client_no])
-        if order_id in cache and len(cache[order_id]) is 2:
-            print('I have cashed value for order_id ', order_id, " ")
+        if order_id in cache and len(cache[order_id]) == 2:
+            logging.info("Found result in cache. { OrderNo: %s}", order_id,
+                         extra=logger.NODE_INFO)
+
             result = cache[order_id][0]
             result_proofs = cache[order_id][1]
             injected_result = get_injected_result(client_no,
@@ -534,18 +700,36 @@ class replica(process):
                                       client_direct_msg_counter[client_no]):
                 result_proofs = result_proofs[1][1:]
             result_proof_pair = (result, result_proofs)
+
+            logging.info("Retransmission result send to client from cached" +
+                         "result. {RESULT: %s , FromReplica: %s ToClient: %s}",
+                         result_proof_pair[0], str(replica_no), str(client_no),
+                         extra=logger.NODE_INFO)
+
             send(('retransmission_result', result_proof_pair, replica_no,),
                  to=client)
         else:
+            logging.info("Retransmission request send to HEAD. {OrderNo: %s" +
+                         "OrderRequest: %s ClientNo: %s ClientId: %s}",
+                         str(order_id), str(order_req), str(client_no),
+                         str(client), extra=logger.NODE_INFO)
+
             send(('retransmission_to_head', client, client_no,  self,
                  order_id, order_req,), to=replicas[0])
             if await(received(('retransmission_ack', ))):
                 print("Ack from head received, do nothing")
+                logging.info("Retransmission ACK received from HEAD for " +
+                             "OrderNo {%s}. Do nothing !!!", order_id,
+                             extra=logger.NODE_INFO)
+
             elif timeout(int(time_out) / 1000):
                 print("Reconfiguration request raised by ", self)
+                logging.info("Reconfiguration request raised by self",
+                             extra=logger.NODE_INFO)
 
     def run():
         print("Replica : ", str(self.me))
+        logging.info("Running Replica...", extra=logger.NODE_INFO)
         set_failure_triggers()
         while True:
             await(received(('',)))

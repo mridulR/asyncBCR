@@ -62,12 +62,12 @@ class client(process):
 
         if is_valid_result_proofs(result_proofs):
             print("Result proof verification passed")
-            logging.info("Result proof verification PASS - RESULT_PROOF {" +
-                         " %s }", result_proofs, extra=logger.NODE_INFO)
+            logging.info("Result proof verification PASS - RESULT: {" +
+                         " %s }", result_proofs[0][0], extra=logger.NODE_INFO)
         else:
             print("Result proof verification failed")
-            logging.info("Result proof verification FAIL - RESULT_PROOF {" +
-                         " %s }", result_proofs, extra=logger.NODE_INFO)
+            logging.info("Result proof verification FAIL - RESULT: {" +
+                         " %s }", result_proofs[0][0], extra=logger.NODE_INFO)
         return
 
     def is_valid_result_proofs(result_proofs):
@@ -129,9 +129,10 @@ class client(process):
         """ Receiving the result_proof from replicas. """
 
         logging.info("Received RESULT_PROOF. {RequestId : %s FromReplica: %s" +
-                     " ReplicaNo: %s }, RESULT_PROOF: { %s }", str(request_id),
+                     " ReplicaNo: %s }, RESULT: { %s }", str(request_id),
                      self.current_replicas_name[int(replica_no)],
-                     str(replica_no), result_proof, extra=logger.NODE_INFO)
+                     str(replica_no), result_proof[0],
+                     extra=logger.NODE_INFO)
 
         # Verify_result_proof(result_proof) ---- > Part of algorithm
         verify_result_proof(result_proof[1])
@@ -145,10 +146,10 @@ class client(process):
 
         print("Received Retransmission result ", replica_no)
         print(result_proof)
-        logging.info("Received RESULT_PROOF for retransmitted request." +
-                     "From Replica {Name:%s, No:%s}, RESULT_PROOF { %s }",
+        logging.info("Received RESULT for retransmitted request." +
+                     "From Replica {Name:%s, No:%s}, RESULT { %s }",
                      self.current_replicas_name[int(replica_no)],
-                     self.current_replicas[int(replica_no)], result_proof,
+                     self.current_replicas[int(replica_no)], result_proof[0],
                      extra=logger.NODE_INFO)
         return
 

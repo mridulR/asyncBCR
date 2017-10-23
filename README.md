@@ -1,10 +1,12 @@
 # Byzantine chain replication (BCR)
 
-This is phase 2 implementation of Byzantine chain replication protocol for the course project CSE 535.
+This is phase 2 implementation of Byzantine chain replication protocol for the
+course project CSE 535.
 
 ## PLATFORM USED FOR DEVELOPMENT AND TESTING
 
-This project is being developed and tested on Mac OSX as well as Linux. Specifications are as follows:
+This project is being developed and tested on Mac OSX as well as Linux.
+Specifications are as follows:
 
 1. Mac OSX operating system (Yosemite - 10.10.5)
    Python Version - 3.6.3
@@ -17,7 +19,8 @@ This project is being developed and tested on Mac OSX as well as Linux. Specific
    Python Version - 3.5.2
    Python Implementation - CPython
    DistAlgo Version - 1.0.9
-   Type of Host - Laptop with VMs (MacBook Pro with Ubuntu installed on Virtual Box)
+   Type of Host - Laptop with VMs (MacBook Pro with Ubuntu installed on Virtual
+   Box)
 
 
 ### INSTRUCTIONS TO RUN PROJECT
