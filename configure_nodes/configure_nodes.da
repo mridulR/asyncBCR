@@ -72,9 +72,6 @@ def main():
     client_signing_keys = []
     for client_no in range(0, int(config_values[client.NUM_OF_CLIENTS])):
         node_name = 'ClientNode' + str(client_no)
-
-        # TODO: Right now only supporting localhost.
-
         host_name = 'localhost'
         if host_name != 'localhost':
             node_name += '@' + host_name
