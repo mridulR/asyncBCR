@@ -70,18 +70,18 @@ Specifications are as follows:
           much meaningful work. We faced issues while calling start from run of another distAlgo
           process.
       3.) Operations on strings having quotes is not handled properly and will trim all quotes.
-      4.) Fault injection is not working in all the cases.
-      
 
 ### CONTRIBUTIONS:
     Mridul Ranjan - Worked mostly on Utils and Replicas.
                   - Fault Triggers and Failures was done collectively.
                   - Result proofs validation at client.
                   - Supporting all dictionary operations.
+                  - Coming up with testing scenarios
 
     Rohit Kumar   - Worked on configuration of nodes with hashing.
                   - Worked on setting up messaging between clients and replicas
                   - Worked on timeouts, generating keys and fixing bugs.
+                  - Worked on logging subsystem
 
 ### MAIN FILES:
                   configuration_nodes -> /configure_nodes/configure_nodes.da
@@ -93,15 +93,28 @@ Specifications are as follows:
                           /src/utils/config_parser.py
 
 ### CODE SIZE
+
+git ls-files | grep -E ".da|.py" | xargs wc -l
+
+========================================
+  LOC|  FILENAME
+========================================
+  164| configure_nodes/configure_nodes.da
+    0| src/__init__.py
+  267| src/client/client.da
+   66| src/olympus/olympus.da
+  735| src/replicas/replica.da
+    0| src/utils/__init__.py
+   62| src/utils/command_executor.py
+   23| src/utils/config_parser.py
+   40| src/utils/logger.py
+=========================================
+ 1357| total
         
 
 ### LANGUAGE FEATURE USAGE
-                  list comprehensions ---> 
-                  dictionary comprehensions ---> 
+                  list comprehensions ---> ~45
+                  dictionary comprehensions ---> ~20
                   set comprehensions  ---> 3
                   aggregations ---> 0
                   quantifications ---> 0
-
-
-
-
