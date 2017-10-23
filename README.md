@@ -70,6 +70,10 @@ Specifications are as follows:
           much meaningful work. We faced issues while calling start from run of another distAlgo
           process.
       3.) Operations on strings having quotes is not handled properly and will trim all quotes.
+      4.) Pattern matching was not very accurate. Did'nt test this thoroughly.
+      5.) Result change at head from injection code fails. Client continously
+          retransmits although it must not.
+      6.) Indirect message triggers are not handled
 
 ### CONTRIBUTIONS:
     Mridul Ranjan - Worked mostly on Utils and Replicas.
