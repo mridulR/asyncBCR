@@ -2,12 +2,15 @@
 #                                            #
 #                  TEST CASE 1:              #
 #                  ===========               #
-#                                            #
+# Single_client_with_change_operation_At_head                                            #
 ##############################################
 
 	# Description:
       ===========
-
+      when change operation occurs at head, no other replica are able to
+      identify misbehavior. Result proof finally reaches client where it
+      identifies that the result is not same which it has asked for. Right now
+      we are not retransmitting in this scenario but logging it.
 
 	# Configuration File:
       ==================
@@ -23,7 +26,8 @@
 
 	# Programatic Check of Correctness:
       ================================
-
+      This was verified at client. Same operations were performed on dictionary
+      and results were verified.
 
 	# Outcome:  PASS
       ========
@@ -33,13 +37,14 @@
 #                                            #
 #                  TEST CASE 2:              #
 #                  ===========               #
-#                                            #
+ Single client with changing operation failure at middle node.
 ##############################################
 
 	# Description:
       ===========
-
-
+    In this case result proof validation at next replica which is tail will drop the message
+    This will cause timeout at client and retransmission requests are send to all replicas
+     . This time middle node will not change operation and hence client will get result proof.
 	# Configuration File:
       ==================
 
@@ -54,7 +59,7 @@
 
 	# Programatic Check of Correctness:
       ================================
-
+      We checked this from sequence of log messages in client and replicas.
 
 	# Outcome:  PASS
       ========
@@ -64,11 +69,13 @@
 #                  TEST CASE 3:              #
 #                  ===========               #
 #                                            #
+# Single_client_with_change_operation_At_Tail                                            #
 ##############################################
 
 	# Description:
       ===========
-
+    Tail changes the operation. Hence client doesn't receive the message
+    it has been waiting for. This causes timeout for one time.
 
 	# Configuration File:
       ==================
@@ -84,7 +91,7 @@
 
 	# Programatic Check of Correctness:
       ================================
-
+      This was verified from log files.
 
 	# Outcome:  PASS
       ========
@@ -94,12 +101,13 @@
 #                                            #
 #                  TEST CASE 4:              #
 #                  ===========               #
-#                                            #
+# Single client change result at tail                                           #
 ##############################################
 
 	# Description:
       ===========
-
+     In this case client will timeout and cause retransmission.
+     Next time it will get the result as tail will send correct value.
 
 	# Configuration File:
       ==================
@@ -115,7 +123,7 @@
 
 	# Programatic Check of Correctness:
       ================================
-
+     Verified with local dictionary at client and log files.
 
 	# Outcome:  PASS
       ========
@@ -125,12 +133,13 @@
 #                                            #
 #                  TEST CASE 5:              #
 #                  ===========               #
-#                                            #
+#   single client with no failure for psedorandom                                         #
 ##############################################
 
 	# Description:
       ===========
-
+    A list of psedorandom orders were generated.
+    There was no failure.
 
 	# Configuration File:
       ==================
@@ -146,7 +155,7 @@
 
 	# Programatic Check of Correctness:
       ================================
-
+    Verified by local copy of dictionary at client.
 
 	# Outcome:  PASS
       ========
@@ -156,12 +165,14 @@
 #                                            #
 #                  TEST CASE 6:              #
 #                  ===========               #
-#                                            #
+# Single client change result at middle replica                                           #
 ##############################################
 
 	# Description:
       ===========
-
+    When middle node changes result, it is caught by next replica
+    which is tail in this case. This causes timeout at client
+    who retransmits request.This time client gets result.
 
 	# Configuration File:
       ==================
@@ -177,7 +188,8 @@
 
 	# Programatic Check of Correctness:
       ================================
-
+     By verifying the sequence of logs at replicas
+     and clients.
 
 	# Outcome:  PASS
       ========
@@ -186,12 +198,13 @@
 #                                            #
 #                  TEST CASE 7:              #
 #                  ===========               #
-#                                            #
+# Single client no failure with mix of workload and psedorandom inputs                                           #
 ##############################################
 
 	# Description:
       ===========
-
+    Client is provided with psedorandom and fixed set of workload.
+    No failure occurs.
 
 	# Configuration File:
       ==================
@@ -207,7 +220,7 @@
 
 	# Programatic Check of Correctness:
       ================================
-
+     This was verified with local copy of dictionary at client.
 
 	# Outcome:  PASS
       ========
@@ -217,12 +230,13 @@
 #                                            #
 #                  TEST CASE 8:              #
 #                  ===========               #
-#                                            #
+# Unrecognised command from client                                           #
 ##############################################
 
 	# Description:
       ===========
-
+    When client sends unknown command, other
+    than put, get, slice and append; head ignores the request.
 
 	# Configuration File:
       ==================
@@ -238,7 +252,9 @@
 
 	# Programatic Check of Correctness:
       ================================
-
+    Head logs this error and forwards no shuttle.
+    Thus client will continuosly send retrnsmission
+    requests.
 
 	# Outcome:  PASS
       ========
