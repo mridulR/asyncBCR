@@ -567,7 +567,7 @@ class replica(process):
                                  extra=logger.NODE_INFO)
 
                     send(('result_proof', (result, result_proofs),
-                          self.replica_no, unique_order_ide), to=client)
+                          self.replica_no, unique_order_ide, order_req), to=client)
                     history.append(order_proofs)
                     print("sending result proof shuttle back")
 
