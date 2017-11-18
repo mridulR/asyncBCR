@@ -131,13 +131,11 @@ class client(process):
 
         if VER_MODE[0] == config[VER_STRATEGY]:
             if result == result_map[request_id][0]:
-                #print("req and rcv order are same")
                 logging.info("PASS: Result from replica matches self " +
                              "computed result- { RequestId: %s Result: %s }",
                              request_id, result, extra=logger.NODE_INFO)
                 return True
             else:
-                #print("req and rcv order are different ", result)
                 logging.info("FAIL: Result from replica matches self " +
                              "computed result- { RequestId: %s Result: %s }",
                              request_id, result, extra=logger.NODE_INFO)
@@ -169,20 +167,18 @@ class client(process):
                      str(replica_no), result_proof[0],
                      extra=logger.NODE_INFO)
 
-        # Verify_result_proof(result_proof) ---- > Part of algorithm
         print ("Order received (by first) -  ", result_proof[0][1])
-        print ("Result received (bt first) -  ", result_proof[0][0])
-        print ("No of replies -  ", len(result_proof))
+        print ("Result received (by first) -  ", result_proof[0][0])
+        print ("Request id - ", request_id, "No of replies -  ", len(result_proof))
         verify_result_proof(result_proof, request_id)
-        #verify_result(result_proof[0], request_id)
         return
 
     def receive(msg=('retransmission_result', result_proof, replica_no)):
         """ Receiving the RESULT_PROOF for retransmitted request from replica.
         """
 
-        print("Received Retransmission result ", replica_no)
-        print(result_proof)
+        print("Received Retransmission result from - ", replica_no)
+
         logging.info("Received RESULT for retransmitted request." +
                      "From Replica {Name:%s, No:%s}, RESULT { %s }",
                      self.current_replicas_name[int(replica_no)],
@@ -285,17 +281,17 @@ class client(process):
                         generate_psedorandom(int(seed_num_pair_arr[0]),
                                              int(seed_num_pair_arr[1]))
                     for gen_order in gen_orders:
-                        print(gen_order)
                         request_id = randint(1, 9000)
+                        print("Order requested - " ,gen_order, " Request_id - ", request_id)
                         result_map[request_id] =\
                             (command_executor.get_result(
                                 gen_order, running_state), gen_order)
                         execute_order(gen_order, request_id)
                 else:
-                    print("Order requested - " + order)
                     logging.info("ORDER_REQUEST: %s ", str(order),
                                  extra=logger.NODE_INFO)
                     request_id = randint(1, 9000)
+                    print("Order requested - " + order, " Request_id - ", request_id)
                     result_map[request_id] = (command_executor.get_result(
                         order, running_state), order)
                     execute_order(order, request_id)

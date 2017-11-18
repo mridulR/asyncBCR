@@ -197,7 +197,7 @@ class replica(process):
         signed = sign_key.sign(digest)
         return (result, order, replica_no, [signed])
 
-    def is_valid_result_proof(result_proofs):
+    def is_valid_result_proof(result_proofs, cal_result):
         """ Validates if the result_proof is correct or not.
                -If the result doesn't match the predecessor replica's result
                 then returns false.
@@ -213,29 +213,33 @@ class replica(process):
             logging.error("MISBEHAVIOUR: Empty Result Proof ",
                           extra=logger.NODE_INFO)
             return False
+        
+        
         result = result_proofs[0][0]
         order = result_proofs[0][1]
         for ind in range(0, len(replicas)):
-            result_proof = result_proofs[ind]
-            pred_result = result_proof[0]
-            pred_order = result_proof[1]
-            if result != pred_result or order != pred_order:
-                logging.error("MISBEHAVIOUR: Conflicting result or OrderNo " +
+            try:
+                result_proof = result_proofs[ind]
+                pred_result = result_proof[0]
+                pred_order = result_proof[1]
+                if result != pred_result or order != pred_order:
+                    logging.error("MISBEHAVIOUR: Conflicting result or OrderNo " +
                               "does not match. {Result: %s, OrderNo: %s}" +
                               "{Predecessor Replica Result: %s ," +
                               "Predecessor Replica OrderNo: %s}", result,
                               order, pred_result, pred_order,
                               extra=logger.NODE_INFO)
-                return False
-            for sec in range(0, ind + 1):
-                verify_key = replica_verify_keys[sec]
-                try:
-                    verify_key.verify(result_proof[3][sec])
-                except nacl.exceptions.BadSignatureError:
-                    logging.error("MISBEHAVIOUR: Bad signature error in " +
-                                  "Result Proof", extra=logger.NODE_INFO)
-
                     return False
+                for sec in range(0, ind + 1):
+                    verify_key = replica_verify_keys[sec]
+                    try:
+                        verify_key.verify(result_proof[3][sec])
+                    except nacl.exceptions.BadSignatureError:
+                        logging.error("MISBEHAVIOUR: Bad signature error in " +
+                                  "Result Proof", extra=logger.NODE_INFO) 
+                        return False
+            except IndexError:
+                return False
         return True
 
     def is_valid_order_proofs(order_proofs):
@@ -352,7 +356,7 @@ class replica(process):
             then create the order_proof and result_proof which is forwarded
             along the chain. """
 
-        print("Forwarding order request to next : ", order_req)
+        print("Received order request at head : ", order_req)
         current_slot += 1
         # No need to verify order proof at head
         order_proofs = []
@@ -473,6 +477,9 @@ class replica(process):
                      replicas_name[int(replica_no)-1], extra=logger.NODE_INFO)
 
         if self.next_r != None:
+
+            print("Received forward shuttle - ", unique_order_ide)
+        
             if client_no not in client_shuttle_counter:
                 client_shuttle_counter[client_no] = 0
             client_shuttle_counter[client_no] += 1
@@ -519,6 +526,7 @@ class replica(process):
                              order_proofs[0][1], str(client_no),
                              replicas_name[int(replica_no)+1],
                              extra=logger.NODE_INFO)
+                print ("Forwarding shuttle - ", unique_order_ide)
                 send(('forward_shuttle', client, client_no, unique_order_ide,
                      order_proofs, result_proofs,), to=self.next_r)
             # else make reconfiguration call to olympus
@@ -527,7 +535,7 @@ class replica(process):
             if client_no not in client_shuttle_counter:
                 client_shuttle_counter[client_no] = 0
             client_shuttle_counter[client_no] += 1
-            print("Tail sending result to client")
+            print("Received forward shuttle - ", unique_order_ide)
 
             if is_valid_order_proofs(order_proofs):
                 current_slot, order_req = get_slot_order(order_proofs)
@@ -551,7 +559,6 @@ class replica(process):
                 predecessor_results = result_proofs[replica_no - 1][3]
                 result_proofs.append(combine_result_proof(result, order_req,
                                      predecessor_results))
-                # if is_valid_result_proof(result_proofs):
                 cache[unique_order_ide] = [result, result_proofs]
                 # Injection code ----- Start
                 if get_injected_drop_stmt(client_no,
@@ -566,10 +573,10 @@ class replica(process):
                              result, str(client_no),
                              extra=logger.NODE_INFO)
 
+                print ("sending result proof to client - ", unique_order_ide)
                 send(('result_proof', result_proofs,
                         self.replica_no, unique_order_ide), to=client)
                 history.append(order_proofs)
-                print("sending result proof shuttle back")
 
                 logging.info("Sending REVERSE_SHUTTLE to previous " +
                              "replica in chain. { OrderNo: %s, " +
@@ -579,15 +586,17 @@ class replica(process):
                              str(client_no),
                                 replicas_name[int(replica_no)-1],
                              extra=logger.NODE_INFO)
-
+                print ("sending back result proof - ", unique_order_ide)
                 send(('result_shuttle', unique_order_ide, client_no,
                       result_proofs,), to=self.prev)
-                return
+            else:
+                print ("order proof verification failed  - ", unique_order_ide)
+            return
                 #else:  No verification for result proof at tail
                 #    print("Result proof error so raise reconfiguration")
 
-    def trigger_failure_injection_for_result_shuttle(client_no,
-                                                     msg_count_by_client):
+    def trigger_failure_injection_for_result_shuttle( \
+            client_no, msg_count_by_client):
         key = str(client_no) + "_" + str(msg_count_by_client)
         if str(key) in client_result_shuttle_trigger:
             val = client_result_shuttle_trigger[key]
@@ -626,7 +635,7 @@ class replica(process):
                                               client_result_shuttle_counter
                                               [client_no])
         # Injected code -----End
-        output("Received  result from next")
+        output("Received result shuttle from next for - ", unique_order_ide)
         result_with_proof = cache[unique_order_ide]
         result_with_proof.append(result_proof_pair)
         cache[unique_order_ide] = result_with_proof
@@ -648,7 +657,7 @@ class replica(process):
                          str(unique_order_ide), str(client_no),
                          result_proof_pair[0][0], extra=logger.NODE_INFO)
             
-            if is_valid_result_proof(result_proof_pair):
+            if is_valid_result_proof(result_proof_pair, result_with_proof[0]):
                 send(('result_shuttle', unique_order_ide, client_no,
                       result_proof_pair,), to=self.prev)
             else:
@@ -680,8 +689,7 @@ class replica(process):
         if client_no not in client_direct_msg_counter:
             client_direct_msg_counter[client_no] = 0
         client_direct_msg_counter[client_no] += 1
-        print('Retrnsmission request received...... sending response')
-        print("cache ", cache)
+        print("Retrnsmission request received - ", order_id, " sending response")
         set_global_operation(order)
         trigger_failure_injection_for_shuttle(client_no,
                                               client_direct_msg_counter
