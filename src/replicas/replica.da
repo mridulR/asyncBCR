@@ -160,7 +160,7 @@ class replica(process):
         digest = HASHER(msg, encoder=nacl.encoding.HexEncoder)
         signed = sign_key.sign(digest)
         predecessor_results.append(signed)
-        return (result, order, predecessor_results)
+        return (result, order, replica_no, predecessor_results)
 
     def combine_order_proof(slot_no, order_string, predecessor_orders):
         """ Updates the order_proof received from predesessor replica, with
@@ -195,7 +195,7 @@ class replica(process):
         msg = 16 * str.encode(result)
         digest = HASHER(msg, encoder=nacl.encoding.HexEncoder)
         signed = sign_key.sign(digest)
-        return (result, order, [signed])
+        return (result, order, replica_no, [signed])
 
     def is_valid_result_proof(result_proofs):
         """ Validates if the result_proof is correct or not.
@@ -230,7 +230,7 @@ class replica(process):
             for sec in range(0, ind + 1):
                 verify_key = replica_verify_keys[sec]
                 try:
-                    verify_key.verify(result_proof[2][sec])
+                    verify_key.verify(result_proof[3][sec])
                 except nacl.exceptions.BadSignatureError:
                     logging.error("MISBEHAVIOUR: Bad signature error in " +
                                   "Result Proof", extra=logger.NODE_INFO)
@@ -418,7 +418,7 @@ class replica(process):
         key = str(client_no)
         injected_change_result[key] = msg_num
 
-    def set_trigger_for_drop_resut_stmt(client_no, msg_num):
+    def set_trigger_for_drop_result_stmt(client_no, msg_num):
         key = str(client_no)
         injected_drop_result[key] = msg_num
 
@@ -503,7 +503,7 @@ class replica(process):
                 # Injected code ----- End
 
                 cache[unique_order_ide] = [result]
-                predecessor_results = result_proofs[replica_no - 1][2]
+                predecessor_results = result_proofs[replica_no - 1][3]
                 result_proofs.append(combine_result_proof(result, order_req,
                                      predecessor_results))
 
@@ -548,42 +548,43 @@ class replica(process):
                 if injected_result != None:
                     result = injected_result
                 # Injected code ------ End
-                predecessor_results = result_proofs[replica_no - 1][2]
+                predecessor_results = result_proofs[replica_no - 1][3]
                 result_proofs.append(combine_result_proof(result, order_req,
                                      predecessor_results))
-                if is_valid_result_proof(result_proofs):
-                    cache[unique_order_ide] = [result, result_proofs]
-                    # Injection code ----- Start
-                    if get_injected_drop_stmt(client_no,
-                                              client_shuttle_counter
-                                              [client_no]):
-                        result_proofs = result_proofs[1:]
+                # if is_valid_result_proof(result_proofs):
+                cache[unique_order_ide] = [result, result_proofs]
+                # Injection code ----- Start
+                if get_injected_drop_stmt(client_no,
+                                          client_shuttle_counter
+                                          [client_no]):
+                    result_proofs = result_proofs[1:]
                     # Injected code ------ End
 
-                    logging.info("Sending RESULT_PROOF to Client. { OrderNo:" +
-                                 " %s, OrderRequest: %s Result: %s ClientNo:" +
-                                 " %s }", unique_order_ide, order_proofs[0][1],
-                                 result, str(client_no),
-                                 extra=logger.NODE_INFO)
+                logging.info("Sending RESULT_PROOF to Client. { OrderNo:" +
+                             " %s, OrderRequest: %s Result: %s ClientNo:" +
+                             " %s }", unique_order_ide, order_proofs[0][1],
+                             result, str(client_no),
+                             extra=logger.NODE_INFO)
 
-                    send(('result_proof', (result, result_proofs),
-                          self.replica_no, unique_order_ide, order_req), to=client)
-                    history.append(order_proofs)
-                    print("sending result proof shuttle back")
+                send(('result_proof', result_proofs,
+                        self.replica_no, unique_order_ide), to=client)
+                history.append(order_proofs)
+                print("sending result proof shuttle back")
 
-                    logging.info("Sending REVERSE_SHUTTLE to previous " +
-                                 "replica in chain. { OrderNo: %s, " +
-                                 "OrderRequest: %s Result: %s ClientNo: " +
-                                 "%s PreviousReplicaName: %s }",
-                                 unique_order_ide, order_proofs[0][1], result,
-                                 str(client_no),
-                                 replicas_name[int(replica_no)-1],
-                                 extra=logger.NODE_INFO)
+                logging.info("Sending REVERSE_SHUTTLE to previous " +
+                             "replica in chain. { OrderNo: %s, " +
+                             "OrderRequest: %s Result: %s ClientNo: " +
+                             "%s PreviousReplicaName: %s }",
+                             unique_order_ide, order_proofs[0][1], result,
+                             str(client_no),
+                                replicas_name[int(replica_no)-1],
+                             extra=logger.NODE_INFO)
 
-                    send(('result_shuttle', unique_order_ide, client_no,
-                          result_proofs,), to=self.prev)
-                else:
-                    print("Result proof error so raise reconfiguration")
+                send(('result_shuttle', unique_order_ide, client_no,
+                      result_proofs,), to=self.prev)
+                return
+                #else:  No verification for result proof at tail
+                #    print("Result proof error so raise reconfiguration")
 
     def trigger_failure_injection_for_result_shuttle(client_no,
                                                      msg_count_by_client):
@@ -646,9 +647,12 @@ class replica(process):
                          "chain. { OrderNo: %s, ClientNo: %s Result: %s }",
                          str(unique_order_ide), str(client_no),
                          result_proof_pair[0][0], extra=logger.NODE_INFO)
-
-            send(('result_shuttle', unique_order_ide, client_no,
-                  result_proof_pair,), to=self.prev)
+            
+            if is_valid_result_proof(result_proof_pair):
+                send(('result_shuttle', unique_order_ide, client_no,
+                      result_proof_pair,), to=self.prev)
+            else:
+                print("Raise reconfiguration as result proof has exception")
         return
 
     def trigger_failure_injection_for_cl_dr_msg(client_no,
