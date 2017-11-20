@@ -37,12 +37,119 @@ class olympus(process):
         logging.info("Received setup - config_file: %s " +
                      "replica_list: %s replica_name: %s", config_file,
                      replica_list, replica_name, extra=logger.NODE_INFO)
+
+        self.quorum_size = ((len(replica_list) - 1) / 2) + 1
+
+        self.is_reconfig_in_progress = False
+        self.replica_info = {}
+        self.incons_hist_replica = {}
+        self.config = 0
         return
+
+    def is_checkpoint_consistent(replica_info):
+        if len(replica_info) < 2:
+            return False
+        chk_pt_ind = -1
+        chk_pt = ""
+        for key in replica_info.keys():
+            value = replica_info[key]
+            if chk_pt_ind == -1 and len(chk_pt) == 0:
+                chk_pt_ind = value[0]
+                chk_pt = value[1]
+                continue
+            if chk_pt_ind != value[0]:
+                return False
+            else:
+                if len(chk_pt) != len(value[1]):
+                    return False
+                for sec in chk_pt.keys():
+                    val1 = chk_pt[sec]
+                    if sec not in value[1].keys():
+                        return False
+                    val2 = value[1][sec]
+                    if val1 != val2:
+                        return False
+        return True
+
+    def build_longest_history(replica_info):
+        if len(replica_info) < 2:
+            return None
+        longest_hist = {}
+        for key in replica_info.keys():
+            hist = replica_info[key][2]
+            for order_proofs in hist:
+                slot_no = order_proofs[0][0]
+                operation = order_proofs[0][1]
+                if slot_no in longest_hist.keys():
+                    prev_oper = longest_hist[slot_no]
+                    if prev_oper != operation:
+                        return None
+                else:
+                    longest_hist[slot_no] = operation
+
+        return longest_hist
+            
+                    
+    def is_history_consistent(replica_info):
+        long_hist = build_longest_history(replica_info)
+        if long_hist == None:
+            return False
+        return True
+
+
+    def has_consistent_history_chk_pt(replica_info):
+        if not is_checkpoint_consistent(replica_info):
+            return False
+        if not is_history_consistent(replica_info):
+            return False
+        return True
+
+    def receive(msg=('wedge_resp', replica_no, chk_pt_ind, chk_pt, hist, client_ord)):
+        print("Reconfiguration  response received from ", replica_no)
+        
+        if is_reconfig_in_progress == False:
+            replica_info = {}
+            config += 1
+            is_reconfig_in_progress = True
+
+        if replica_no in incons_hist_replica:
+            print ("Ignoring - ", replica_no, " because of inconsistent history")
+            return
+
+        replica_info[replica_no] = (chk_pt_ind, chk_pt, hist, client_ord)
+
+        if len(incons_hist_replica) >= quorum_size:
+            print("System has t + 1 failures hence broken - ", incons_hist_replica)
+            return
+
+        if len(replica_info) == quorum_size:
+            print("quorum replica - ", replica_info.keys())
+            if has_consistent_history_chk_pt(replica_info) == False:
+                is_reconfig_in_progress = False
+                for replica in replica_list:
+                    send(('wedge',), to=replica)
+            else:
+                long_hist = build_longest_history(replica_info)
+                ## Do catch up
+                new_chk_point = chk_pt
+                new_chk_point.update(long_hist)
+
+
+                config += 1
+            
+                for replica in replica_list:
+                    send(('new_configuration', config, chk_pt_ind + 1, new_chk_point,), to=replica)
+                is_reconfig_in_progress = False    
+
 
     def receive(msg=('req_reconfiguration', client_no)):
         print("Reconfiguration  request received from ", client_no)
-        for replica in replica_list:
-            send(('wedge',), to=replica)
+        if is_reconfig_in_progress == False:
+            incons_hist_replica = {}
+            for replica in replica_list:
+                send(('wedge',), to=replica)
+        else:
+            print("Reconfig is already in progress")
 
     def receive(msg=('req_curr_config', client)):
         """ Receives the CURRENT_CONFIG request from client. """

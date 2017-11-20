@@ -31,6 +31,9 @@ class replica(process):
 
         # state of replica - ACTIVE and IMMUTABLE
         self.state = "ACTIVE"
+
+        # configuration of replica
+        self.config = 0
         
 
         # cache for storing result and result proof
@@ -596,7 +599,6 @@ class replica(process):
                     history = rslt_history
                     
                     '''print("checkpont return Completed ***********************")
-                    print(checkpoint_ind)
                     print(checkpoint)
                     print(history)
                     print("checkpont return Success ***********************")'''
@@ -605,15 +607,39 @@ class replica(process):
                 print("checkpointing failed verification, invoke reconfiguration")    
 
 
+    def receive(msg=('new_configuration', config_ind, chk_pt_ind, chk_pt,), from_=olympus):
+        print("Received new configuration ======, ", chk_pt)
+        self.config = config_ind
+        self.history = []
+        self.opr_count_chk_pt = 0
+        self.checkpoint_ind = chk_pt_ind
+        self.checkpoint = chk_pt
+        self.client_last_op = {}
+        self.current_slot = 0
+        self.running_state = {}
+        self.cache = {}
+
+        for slot in sorted(checkpoint.keys()):
+            result = command_executor.get_result(checkpoint[slot], running_state)    
+            ## TODO: update cache
+            current_slot = slot
+            
+        current_slot += 1
+        self.state = "ACTIVE"
+
+
     def receive(msg=('wedge',), from_=olympus):
         print("wedge statement received from olympus")
+        state = "IMMUTABLE"
+        send(('wedge_resp', replica_no, checkpoint_ind, \
+            checkpoint, history, client_last_op), to=olympus)
 
 
     # Only head is supposed to handle order request from client
     def receive(msg=('request_order', client, client_no, unique_order_ide,
                      order_req,)):
         if self.prev == None:
-            send(('req_reconfiguration', replica_no), to=olympus)
+            #send(('req_reconfiguration', replica_no), to=olympus)
             
             ## If state is not ACTIVE return
             if state == "IMMUTABLE":
@@ -630,6 +656,8 @@ class replica(process):
             if self.opr_count_chk_pt % 3 == 0:
                 print("checkpointing counter - ", opr_count_chk_pt)
                 start_check_pointing()
+                if checkpoint_ind == 2:
+                    send(('req_reconfiguration', replica_no), to=olympus)
 
             if client_no not in client_shuttle_counter:
                 client_shuttle_counter[client_no] = 0
