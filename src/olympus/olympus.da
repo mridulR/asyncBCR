@@ -39,6 +39,11 @@ class olympus(process):
                      replica_list, replica_name, extra=logger.NODE_INFO)
         return
 
+    def receive(msg=('req_reconfiguration', client_no)):
+        print("Reconfiguration  request received from ", client_no)
+        for replica in replica_list:
+            send(('wedge',), to=replica)
+
     def receive(msg=('req_curr_config', client)):
         """ Receives the CURRENT_CONFIG request from client. """
 

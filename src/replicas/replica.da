@@ -25,6 +25,13 @@ class replica(process):
     def setup(config_file, replica_no, replicas, replicas_name, olympus,
               oly_verify_key, replica_verify_keys, sign_key):
         """ Setting up the replica based on configuration."""
+        
+        # client last opearation mapping
+        self.client_last_op = {}
+
+        # state of replica - ACTIVE and IMMUTABLE
+        self.state = "ACTIVE"
+        
 
         # cache for storing result and result proof
         self.cache = {}
@@ -315,8 +322,14 @@ class replica(process):
             HEAD to handle it. It also starts a time waiting for HEAD's ACK. If
             the acknowledgement is not received then then trigger
             reconfiguration to olympus. """
+        
+        if state == "IMMUTABLE":
+            return
 
         if self.prev == None:
+            
+            client_last_op[client_no] = order
+
             if client_no not in client_fwd_rqst_counter:
                 client_fwd_rqst_counter[client_no] = 0
             client_fwd_rqst_counter[client_no] += 1
@@ -374,6 +387,7 @@ class replica(process):
             along the chain. """
 
         print("Received order request at head : ", order_req)
+
         current_slot += 1
         # No need to verify order proof at head
         order_proofs = []
@@ -547,11 +561,15 @@ class replica(process):
         checkpoint.update(rslt_chk_pt)
         history = rslt_history
 
-        '''print("checkpont return Completed ***********************")
-        print(checkpoint_ind)
+        print("checkpont Completed ***********************")
+        print(checkpoint_ind, " - ", client_last_op)
         print(checkpoint)
-        print(history)
-        print("checkpont return Success ***********************")'''
+        print("History : ")
+        for his in history:
+            for order_proofs in his:
+                print("slot - ", order_proofs[0], " order - ", order_proofs[1], \
+                    " replica - ", order_proofs[2], "  sign - ", len(order_proofs[3]))
+        print("checkpont return Success ***********************")
 
         if self.prev != None:
             send(('chk_point_rslt', chk_point_proof, chk_point_index,), to=prev)    
@@ -585,13 +603,24 @@ class replica(process):
                     send(('chk_point_rslt', chk_point_proof, chk_point_index,), to=prev)
             else:
                 print("checkpointing failed verification, invoke reconfiguration")    
-            
+
+
+    def receive(msg=('wedge',), from_=olympus):
+        print("wedge statement received from olympus")
 
 
     # Only head is supposed to handle order request from client
     def receive(msg=('request_order', client, client_no, unique_order_ide,
                      order_req,)):
         if self.prev == None:
+            send(('req_reconfiguration', replica_no), to=olympus)
+            
+            ## If state is not ACTIVE return
+            if state == "IMMUTABLE":
+                return
+
+            client_last_op[client_no] = order_req
+                
             logging.info("HEAD received ORDER_REQUEST from client. { OrderNo" +
                          ": %s, OrderRequest: %s, ClientNo: %s }",
                          unique_order_ide, str(order_req), str(client_no),
@@ -634,12 +663,18 @@ class replica(process):
         if self.next_r != None:
 
             print("Received forward shuttle - ", unique_order_ide)
+
+            if state == "IMMUTABLE":
+                return
         
             if client_no not in client_shuttle_counter:
                 client_shuttle_counter[client_no] = 0
             client_shuttle_counter[client_no] += 1
             if is_valid_order_proofs(order_proofs):
                 current_slot, order_req = get_slot_order(order_proofs)
+
+                client_last_op[client_no] = order_req
+
                 # Injected code ----- Start
                 set_global_operation(order_req)
                 trigger_failure_injection_for_shuttle(client_no,
@@ -695,6 +730,9 @@ class replica(process):
 
             if is_valid_order_proofs(order_proofs):
                 current_slot, order_req = get_slot_order(order_proofs)
+
+                client_last_op[client_no] = order_req
+
                 # Injected code ------ Start
                 set_global_operation(order_req)
                 trigger_failure_injection_for_shuttle(client_no,
@@ -732,6 +770,9 @@ class replica(process):
                 print ("sending result proof to client - ", unique_order_ide)
                 send(('result_proof', result_proofs,
                         self.replica_no, unique_order_ide), to=client)
+                predecessor_order_proof = order_proofs[replica_no - 1][3]
+                order_proofs.append(combine_order_proof(current_slot,
+                                    order_req, predecessor_order_proof))
                 history.append(order_proofs)
 
                 logging.info("Sending REVERSE_SHUTTLE to previous " +
@@ -744,10 +785,15 @@ class replica(process):
                              extra=logger.NODE_INFO)
                 print ("sending back result proof - ", unique_order_ide)
                 print("checkpont Completed ***********************")
-                print(checkpoint_ind)
+                print(checkpoint_ind, " -  ", client_last_op)
                 print(checkpoint)
-                print(history)
-                print("checkpont Success ***********************")
+                print("History : ")
+                for his in history:
+                    for order_proofs in his:
+                        print("slot - ", order_proofs[0], " order - ", order_proofs[1], \
+                            " replica - ", order_proofs[2], "  sign - ", len(order_proofs[3]))
+                print("checkpont return Success ***********************")                
+                
                 send(('result_shuttle', unique_order_ide, client_no,
                       result_proofs,), to=self.prev)
             else:
@@ -823,12 +869,15 @@ class replica(process):
                       result_proof_pair,), to=self.prev)
             else:
                 print("Raise reconfiguration as result proof has exception")
-        else:
-            print("checkpont Completed ***********************")
-            print(checkpoint_ind)
-            print(checkpoint)
-            print(history)
-            print("checkpont return Success ***********************")
+        print("checkpont Completed ***********************")
+        print(checkpoint_ind, " - ", client_last_op)
+        print(checkpoint)
+        print("History : ")
+        for his in history:
+            for order_proofs in his:
+                print("slot - ", order_proofs[0], " order - ", order_proofs[1],\
+                     " replica - ", order_proofs[2], "  sign - ", len(order_proofs[3]))
+        print("checkpont return Success ***********************")
         return
 
     def trigger_failure_injection_for_cl_dr_msg(client_no,
@@ -852,6 +901,11 @@ class replica(process):
                      "%s, Order: %s, ClientNo: %s, ClientId: %s}",
                      str(order_id), str(order), str(client_no), str(client),
                      extra=logger.NODE_INFO)
+
+        if state == 'IMMUTABLE':
+            return
+
+        client_last_op[client_no] = order
 
         if client_no not in client_direct_msg_counter:
             client_direct_msg_counter[client_no] = 0
