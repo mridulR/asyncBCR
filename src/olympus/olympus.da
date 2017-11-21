@@ -89,8 +89,8 @@ class olympus(process):
                     longest_hist[slot_no] = operation
 
         return longest_hist
-            
-                    
+
+
     def is_history_consistent(replica_info):
         long_hist = build_longest_history(replica_info)
         if long_hist == None:
@@ -107,7 +107,7 @@ class olympus(process):
 
     def receive(msg=('wedge_resp', replica_no, chk_pt_ind, chk_pt, hist, client_ord)):
         print("Reconfiguration  response received from ", replica_no)
-        
+
         if is_reconfig_in_progress == False:
             replica_info = {}
             config += 1
@@ -161,7 +161,7 @@ class olympus(process):
         return True
 
     def receive(msg=('caught_up', client_no, hash_value)):
-        consistent_caught_up[client_no] = hash_value 
+        consistent_caught_up[client_no] = hash_value
         print("Received caught up from ", client_no, " is - ", hash_value)
 
 

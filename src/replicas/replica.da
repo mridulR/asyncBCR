@@ -26,7 +26,7 @@ class replica(process):
     def setup(config_file, replica_no, replicas, replicas_name, olympus,
               oly_verify_key, replica_verify_keys, sign_key):
         """ Setting up the replica based on configuration."""
-        
+
         # client last opearation mapping
         self.client_last_op = {}
 
@@ -35,7 +35,7 @@ class replica(process):
 
         # configuration of replica
         self.config = 0
-        
+
 
         # cache for storing result and result proof
         self.cache = {}
@@ -229,8 +229,8 @@ class replica(process):
             logging.error("MISBEHAVIOUR: Empty Result Proof ",
                           extra=logger.NODE_INFO)
             return False
-        
-        
+
+
         result = result_proofs[0][0]
         order = result_proofs[0][1]
         for ind in range(0, len(replicas)):
@@ -252,7 +252,7 @@ class replica(process):
                         verify_key.verify(result_proof[3][sec])
                     except nacl.exceptions.BadSignatureError:
                         logging.error("MISBEHAVIOUR: Bad signature error in " +
-                                  "Result Proof", extra=logger.NODE_INFO) 
+                                  "Result Proof", extra=logger.NODE_INFO)
                         return False
             except IndexError:
                 return False
@@ -326,12 +326,12 @@ class replica(process):
             HEAD to handle it. It also starts a time waiting for HEAD's ACK. If
             the acknowledgement is not received then then trigger
             reconfiguration to olympus. """
-        
+
         if state == "IMMUTABLE":
             return
 
         if self.prev == None:
-            
+
             client_last_op[client_no] = order
 
             if client_no not in client_fwd_rqst_counter:
@@ -374,7 +374,7 @@ class replica(process):
                     send(('retransmission_result', cache[order_id], \
                             replica_no, order_id,), to=client)
                     send(('retransmission_ack', order_id), to=replica)
-                 
+
                 elif timeout(int(time_out) / 1000):
                     print("Request of reconfiguration from head")
                     logging.info("Request of reconfiguration from head", \
@@ -408,7 +408,7 @@ class replica(process):
             result_proof = []
             result_proof.append(create_result_proof(result, order_req))
 
-            if get_injected_drop_stmt(client_no, 
+            if get_injected_drop_stmt(client_no,
                                       client_shuttle_counter[client_no]):
                 result_proof = []
 
@@ -426,7 +426,7 @@ class replica(process):
         global_operation = order
 
     def get_injected_drop_stmt(client_no, msg_count):
-        key = str(client_no) 
+        key = str(client_no)
         if key in injected_drop_result.keys():
             val = injected_drop_result[key]
             if int(val) + 1 == int(msg_count):
@@ -484,7 +484,7 @@ class replica(process):
     def start_check_pointing():
         if self.prev == None:
             chk_point_proof = {}
-    
+
             '''msg = 16 * str.encode(str(replica_no))
             digest = HASHER(msg, encoder=nacl.encoding.HexEncoder)
             signed = sign_key.sign(digest)'''
@@ -512,7 +512,7 @@ class replica(process):
             return chk_point_proof
 
         result = {}
-        
+
         result = chk_point_proof[0]
         for ind in range(1, len(replicas)):
             result = get_slot_order_intersection(result, chk_point_proof[ind])
@@ -530,7 +530,7 @@ class replica(process):
             if len(temp) != 0:
                 result.append(temp)
         return result
-        
+
 
     def is_valid_chk_pt_proof(chk_point_proof, replica_no):
         if len(chk_point_proof) < 2:
@@ -539,7 +539,7 @@ class replica(process):
         for ind in range(1, replica_no):
             verify_key = replica_verify_keys[ind]
             curr_order_ = chk_point_proof[ind]
-            
+
             curr_slot_order_map = extract_slot_order_map_from_history(history)
             result_slot_order_map = get_slot_order_intersection(result_slot_order_map, curr_slot_order_map)
             if result_slot_order_map == None:
@@ -555,11 +555,11 @@ class replica(process):
                 print("roku5")
                 return False'''
         return True
-        
+
     def receive(msg=('chk_point_rslt', chk_point_proof, chk_point_index,), from_=self.next_r):
         rslt_chk_pt = get_Min_Check_Pt_Map(chk_point_proof)
         rslt_history = get_result_history(rslt_chk_pt, history)
-                         
+
         ## update values
         checkpoint_ind = chk_point_index
         checkpoint.update(rslt_chk_pt)
@@ -576,13 +576,13 @@ class replica(process):
         print("checkpont return Success ***********************")
 
         if self.prev != None:
-            send(('chk_point_rslt', chk_point_proof, chk_point_index,), to=prev)    
+            send(('chk_point_rslt', chk_point_proof, chk_point_index,), to=prev)
 
 
     def receive(msg=('chk_point_frwd', chk_point_proof, chk_point_index,), from_=self.prev):
         if checkpoint_ind + 1 == chk_point_index:
             if is_valid_chk_pt_proof(chk_point_proof, replica_no):
-            
+
                 '''msg = 16 * str.encode(str(replica_no))
                 digest = HASHER(msg, encoder=nacl.encoding.HexEncoder)
                 signed = sign_key.sign(digest)'''
@@ -593,19 +593,19 @@ class replica(process):
                 else:
                     rslt_chk_pt = get_Min_Check_Pt_Map(chk_point_proof)
                     rslt_history = get_result_history(rslt_chk_pt, history)
-                    
+
                     ## update values
                     checkpoint_ind = chk_point_index
                     checkpoint.update(rslt_chk_pt)
                     history = rslt_history
-                    
+
                     '''print("checkpont return Completed ***********************")
                     print(checkpoint)
                     print(history)
                     print("checkpont return Success ***********************")'''
                     send(('chk_point_rslt', chk_point_proof, chk_point_index,), to=prev)
             else:
-                print("checkpointing failed verification, invoke reconfiguration")    
+                print("checkpointing failed verification, invoke reconfiguration")
 
 
     def receive(msg=('new_configuration', config_ind, chk_pt_ind, chk_pt,), from_=olympus):
@@ -621,10 +621,10 @@ class replica(process):
         self.cache = {}
 
         for slot in sorted(checkpoint.keys()):
-            result = command_executor.get_result(checkpoint[slot], running_state)    
+            result = command_executor.get_result(checkpoint[slot], running_state)
             ## TODO: update cache
             current_slot = slot
-            
+
         self.state = "ACTIVE"
 
     def build_slot_order_map(history):
@@ -664,13 +664,13 @@ class replica(process):
                      order_req,)):
         if self.prev == None:
             #send(('req_reconfiguration', replica_no), to=olympus)
-            
+
             ## If state is not ACTIVE return
             if state == "IMMUTABLE":
                 return
 
             client_last_op[client_no] = order_req
-                
+
             logging.info("HEAD received ORDER_REQUEST from client. { OrderNo" +
                          ": %s, OrderRequest: %s, ClientNo: %s }",
                          unique_order_ide, str(order_req), str(client_no),
@@ -718,7 +718,7 @@ class replica(process):
 
             if state == "IMMUTABLE":
                 return
-        
+
             if client_no not in client_shuttle_counter:
                 client_shuttle_counter[client_no] = 0
             client_shuttle_counter[client_no] += 1
@@ -750,7 +750,7 @@ class replica(process):
                 if injected_result != None:
                     result = injected_result
                 # Injected code ----- End
-                
+
                 history.append(order_proofs)
                 cache[unique_order_ide] = [result]
                 predecessor_results = result_proofs[replica_no - 1][3]
@@ -844,8 +844,8 @@ class replica(process):
                     for order_proofs in his:
                         print("slot - ", order_proofs[0], " order - ", order_proofs[1], \
                             " replica - ", order_proofs[2], "  sign - ", len(order_proofs[3]))
-                print("checkpont return Success ***********************")                
-                
+                print("checkpont return Success ***********************")
+
                 send(('result_shuttle', unique_order_ide, client_no,
                       result_proofs,), to=self.prev)
             else:
@@ -996,7 +996,7 @@ class replica(process):
                          "result. {RESULT: %s , FromReplica: %s ToClient: %s}",
                          result_proof_pair[0], str(replica_no), str(client_no),
                          extra=logger.NODE_INFO)
-            
+
             print("sending retransmission respose from cache for - ", order_id)
             send(('retransmission_result', result_proof_pair, replica_no, order_id,),
                  to=client)

@@ -72,7 +72,7 @@ class client(process):
 
     def is_valid_result_proofs(result_proofs, request_id):
         """ Verifying if the result_proof is valid or not. """
-        
+
         if len(result_proofs) < 1:
             return False
 
@@ -302,7 +302,7 @@ class client(process):
                         result_map[request_id] =\
                             (command_executor.get_result(
                                 gen_order, running_state), gen_order)
-                        get_valid_configuration()        
+                        get_valid_configuration()
                         execute_order(gen_order, request_id)
                 else:
                     logging.info("ORDER_REQUEST: %s ", str(order),
