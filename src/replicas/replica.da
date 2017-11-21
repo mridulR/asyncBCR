@@ -62,19 +62,19 @@ class replica(process):
         self.new_configuration_trigger = {}
         self.get_running_state_trigger = {}
         self.catch_up_trigger = {}
-        
+
         # Trigger Counter
         self.client_direct_msg_counter = {}
         self.client_fwd_rqst_counter = {}
         self.client_shuttle_counter = {}
         self.client_result_shuttle_counter = {}
-        self.checkpoint_counter = 0 
+        self.checkpoint_counter = 0
         self.completed_checkpoint_counter = 0
-        self.wedge_request_counter = 0 
-        self.new_configuration_counter = 0 
-        self.get_running_state_counter = 0 
-        self.catch_up_counter = 0 
-        
+        self.wedge_request_counter = 0
+        self.new_configuration_counter = 0
+        self.get_running_state_counter = 0
+        self.catch_up_counter = 0
+
         # current_slot updated only by head replica
         self.current_slot = 0
 
@@ -153,7 +153,7 @@ class replica(process):
         func = {}
         start = operation.find("(")
         end = operation.find(")")
-        func["name"] = operation 
+        func["name"] = operation
         args = []
         func["args"] = args
         if start == -1 or end == -1:
@@ -172,7 +172,7 @@ class replica(process):
         trigger= trigger.replace(' ','')
         index = trigger.find("),")
         if index == -1:
-            return function_list 
+            return function_list
         function_list.append(trigger[:index+1])
         function_list.append(trigger[index+2:])
         return function_list
@@ -193,65 +193,65 @@ class replica(process):
                     trigger_failures = [each.strip() for each in value.split(';')]
                     for trigg_fail in trigger_failures:
                         if trigg_fail.startswith("client_request"):
-                            trigger = trigger_parser(trigg_fail) 
+                            trigger = trigger_parser(trigg_fail)
                             trig = generic_operation_parser(trigger[0])
                             key = trig["args"][0] + "_" + trig["args"][1]
                             operation = trigger[1]
                             client_direct_msg_trigger[key] = operation
                         elif trigg_fail.startswith("forwarded_request"):
-                            trigger = trigger_parser(trigg_fail) 
+                            trigger = trigger_parser(trigg_fail)
                             trig = generic_operation_parser(trigger[0])
                             key = trig["args"][0] + "_" + trig["args"][1]
                             operation = trigger[1]
                             client_fwd_rqst_trigger[key] = operation
                         elif trigg_fail.startswith("shuttle"):
-                            trigger = trigger_parser(trigg_fail) 
+                            trigger = trigger_parser(trigg_fail)
                             trig = generic_operation_parser(trigger[0])
                             key = trig["args"][0] + "_" + trig["args"][1]
                             operation = trigger[1]
                             client_shuttle_trigger[key] = operation
                         elif trigg_fail.startswith("result_shuttle"):
-                            trigger = trigger_parser(trigg_fail) 
+                            trigger = trigger_parser(trigg_fail)
                             trig = generic_operation_parser(trigger[0])
                             key = trig["args"][0] + "_" + trig["args"][1]
                             operation = trigger[1]
                             client_result_shuttle_trigger[key] = operation
                         elif trigg_fail.startswith("checkpoint"):
-                            trigger = trigger_parser(trigg_fail) 
+                            trigger = trigger_parser(trigg_fail)
                             trig = generic_operation_parser(trigger[0])
                             key = trig["args"][0]
                             operation = trigger[1]
-                            checkpoint_trigger[key] = operation 
+                            checkpoint_trigger[key] = operation
                         elif trigg_fail.startswith("completed_checkpoint"):
-                            trigger = trigger_parser(trigg_fail) 
+                            trigger = trigger_parser(trigg_fail)
                             trig = generic_operation_parser(trigger[0])
                             key = trig["args"][0]
                             operation = trigger[1]
                             completed_checkpoint_trigger[key] = operation
                         elif trigg_fail.startswith("wedge_request"):
-                            trigger = trigger_parser(trigg_fail) 
+                            trigger = trigger_parser(trigg_fail)
                             trig = generic_operation_parser(trigger[0])
                             key = trig["args"][0]
                             operation = trigger[1]
                             wedge_request_trigger[key] = operation
                         elif trigg_fail.startswith("new_configuration"):
-                            trigger = trigger_parser(trigg_fail) 
+                            trigger = trigger_parser(trigg_fail)
                             trig = generic_operation_parser(trigger[0])
                             key = trig["args"][0]
                             operation = trigger[1]
                             new_configuration_trigger[key] = operation
                         elif trigg_fail.startswith("get_running_state"):
-                            trigger = trigger_parser(trigg_fail) 
+                            trigger = trigger_parser(trigg_fail)
                             trig = generic_operation_parser(trigger[0])
                             key = trig["args"][0]
                             operation = trigger[1]
                             get_running_state_trigger[key] = operation
                         elif trigg_fail.startswith("catch_up"):
-                            trigger = trigger_parser(trigg_fail) 
+                            trigger = trigger_parser(trigg_fail)
                             trig = generic_operation_parser(trigger[0])
                             key = trig["args"][0]
                             operation = trigger[1]
-                            catch_up_trigger[key] = operation 
+                            catch_up_trigger[key] = operation
 
     return
 
@@ -493,13 +493,13 @@ class replica(process):
         current_slot += 1
         # No need to verify order proof at head
         order_proofs = []
-        
+
         injected_slot = current_slot
         invalid_order_sign = False
         invalid_result_sign = False
         injected_result = None
         injected_extra_op = None
-        injected_drop_result_statement = None 
+        injected_drop_result_statement = None
         injected_drop = None
 
         if triggers != None:
@@ -516,7 +516,7 @@ class replica(process):
 
             if is_result_injected(triggers, keys):
                 injected_result = "OK"
-            
+
             if is_extra_op_injected(triggers, keys ):
                 injected_extra_op = "put('a','a')"
 
@@ -530,11 +530,11 @@ class replica(process):
                 injected_drop = True
 
             if is_history_truncated_injected(triggers, keys ):
-                print("Truncated History")               
+                print("Truncated History")
 
         if injected_extra_op != None:
             extra_op_ret = command_executor.get_result(injected_extra_op, running_state)
- 
+
         # Order proof is a list of tuples (slot, order, replica, [digtal signs
         # of preceding])
         order_proofs.append(create_order_proof(injected_slot, order_req, invalid_order_sign))
@@ -611,7 +611,7 @@ class replica(process):
             elif val == "drop_result_stmt":
                 set_trigger_for_drop_result_stmt(client_no,
                                                  msg_count_by_client)
-    
+
     def extract_slot_order_map_from_history(rep_history):
         slot_order_map = {}
         for list_order_proofs in rep_history:
@@ -746,7 +746,6 @@ class replica(process):
             else:
                 print("checkpointing failed verification, invoke reconfiguration")
 
-
     def receive(msg=('new_configuration', config_ind, chk_pt_ind, chk_pt,), from_=olympus):
         print("Received new configuration ======, ", chk_pt)
         self.config = config_ind
@@ -876,7 +875,7 @@ class replica(process):
             if arg_list[1] in client_direct_msg_trigger:
                 if client_direct_msg_trigger[arg_list[1]].startswith("sleep"):
                     func = generic_operation_parser(client_direct_msg_trigger[arg_list[1]])
-                    interval = func["args"][0] 
+                    interval = func["args"][0]
                     logging.info("HEAD sleep will be triggered.", extra=logger.NODE_INFO)
                     time.sleep(int(interval))
                     logging.info("HEAD sleep completed.", extra=logger.NODE_INFO)
@@ -884,7 +883,7 @@ class replica(process):
             if  arg_list[0] in client_shuttle_trigger:
                 if client_shuttle_trigger[arg_list[0]].startswith("sleep"):
                     func = generic_operation_parser(client_shuttle_trigger[arg_list[0]])
-                    interval = func["args"][0] 
+                    interval = func["args"][0]
                     logging.info("HEAD sleep will be triggered.", extra=logger.NODE_INFO)
                     time.sleep(int(interval))
                     logging.info("HEAD sleep completed.", extra=logger.NODE_INFO)
@@ -906,32 +905,32 @@ class replica(process):
             if arg_list[1] in client_direct_msg_trigger:
                 if client_direct_msg_trigger[arg_list[1]].startswith("truncate_history"):
                     func = generic_operation_parser(client_direct_msg_trigger[arg_list[1]])
-                    count = func["args"][0] 
+                    count = func["args"][0]
                     length = len(history)
                     logging.info("HEAD history will be truncated by %s entries." +
-                         "{ History: %s, CurrentLength: %s TruncateCount: %s }", str(count), history, 
+                         "{ History: %s, CurrentLength: %s TruncateCount: %s }", str(count), history,
                          len(history), str(count), extra=logger.NODE_INFO)
                     if length > int(count) :
                         history = history[:length-int(count)]
                     else:
                         history = []
-                    logging.info("HEAD new history. { History: %s, New Length: %s  }", 
+                    logging.info("HEAD new history. { History: %s, New Length: %s  }",
                                  history, len(history), extra=logger.NODE_INFO)
                     return True
 
             if  arg_list[0] in client_shuttle_trigger:
                 if client_shuttle_trigger[arg_list[0]].startswith("truncate_history"):
                     func = generic_operation_parser(client_shuttle_trigger[arg_list[0]])
-                    count = func["args"][0] 
+                    count = func["args"][0]
                     length = len(history)
                     logging.info("HEAD history will be truncated by %s entries." +
-                         "{ History: %s, CurrentLength: %s TruncateCount: %s }", str(count), history, 
+                         "{ History: %s, CurrentLength: %s TruncateCount: %s }", str(count), history,
                          len(history), str(count), extra=logger.NODE_INFO)
                     if length > int(count) :
                         history = history[:length-int(count)]
                     else:
                         history = []
-                    logging.info("HEAD new history. { History: %s, New Length: %s  }", 
+                    logging.info("HEAD new history. { History: %s, New Length: %s  }",
                                  history, len(history), extra=logger.NODE_INFO)
                     return True
         return False
@@ -977,11 +976,11 @@ class replica(process):
             client_key  = str(client_no) + "_" + str(client_direct_msg_counter[client_no])
             if is_order_injected(trigger_types, [shuttle_key, client_key]):
                 order_inj = "get('X')"
-            
+
             # Injected code -----End
 
             handle_client_req_at_head(client, client_no, unique_order_ide,
-                                      order_inj, trigger_types, 
+                                      order_inj, trigger_types,
                                       [shuttle_key, client_key])
         else:
 
