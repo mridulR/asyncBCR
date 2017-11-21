@@ -44,7 +44,7 @@ class olympus(process):
         self.replica_info = {}
         self.incons_hist_replica = {}
         self.config = 0
-        self.last_check_point = {}
+        self.consistent_caught_up = {}
         return
 
     def is_checkpoint_consistent(replica_info):
@@ -144,18 +144,25 @@ class olympus(process):
                         send(('wedge',), to=replica)
 
     def is_caught_up_consistent(replica_info, long_hist):
+        consistent_caught_up = {}
         for ind in replica_info.keys():
             replica = replica_list[ind]
             send(('catch_up', long_hist), to=replica)
         print("Awaitaing for caught up response from ", replica_info.keys())
-        await(len(setof(a, received(('caught_up', _, _,),
-                from_=a))) == len(replica_info))
+        await(len(setof(a, received(('caught_up', _, _,), from_=a))) == len(replica_info))
         print("Await ended")
-
+        hash_value = ""
+        for key in replica_info.keys():
+            if len(hash_value) == 0:
+                hash_value = consistent_caught_up[key]
+                continue
+            if hash_value != consistent_caught_up[key]:
+                return False
         return True
 
     def receive(msg=('caught_up', client_no, hash_value)):
-        print("Received caught up from ", client_no)
+        consistent_caught_up[client_no] = hash_value 
+        print("Received caught up from ", client_no, " is - ", hash_value)
 
 
     def receive(msg=('req_reconfiguration', client_no)):

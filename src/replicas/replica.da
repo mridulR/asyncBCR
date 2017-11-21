@@ -5,6 +5,7 @@ import os
 import logging
 import time
 import re
+import json
 import nacl.encoding
 import nacl.signing
 import nacl.hash
@@ -626,9 +627,29 @@ class replica(process):
             
         self.state = "ACTIVE"
 
+    def build_slot_order_map(history):
+        slot_order_map = {}
+        for order_proofs in history:
+            slot_no = order_proofs[0][0]
+            operation = order_proofs[0][1]
+            slot_order_map[slot_no]= operation
+        return slot_order_map
+
+    def catch_longest_hist(slot_order_map, long_hist):
+        for key in long_hist.keys():
+            if key not in slot_order_map:
+                slot_order_map[key] = long_hist[key]
+        return slot_order_map
+
     def receive(msg=('catch_up', long_hist), from_=olympus):
         print("sending caught up to olympus")
-        send(('caught_up', replica_no, "hash_hist"), to=olympus)
+        slot_order_map = build_slot_order_map(history)
+        catched_history = catch_longest_hist(slot_order_map, long_hist)
+        catched_hist_str = json.dumps(catched_history)
+        print("catched_hist_str ********* ", catched_hist_str)
+        msg = 16 * str.encode(catched_hist_str)
+        digest = HASHER(msg, encoder=nacl.encoding.HexEncoder)
+        send(('caught_up', replica_no, digest), to=olympus)
 
 
     def receive(msg=('wedge',), from_=olympus):
