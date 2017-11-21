@@ -626,6 +626,10 @@ class replica(process):
             
         self.state = "ACTIVE"
 
+    def receive(msg=('catch_up', long_hist), from_=olympus):
+        print("sending caught up to olympus")
+        send(('caught_up', replica_no, "hash_hist"), to=olympus)
+
 
     def receive(msg=('wedge',), from_=olympus):
         print("wedge statement received from olympus")

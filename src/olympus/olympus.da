@@ -44,6 +44,7 @@ class olympus(process):
         self.replica_info = {}
         self.incons_hist_replica = {}
         self.config = 0
+        self.last_check_point = {}
         return
 
     def is_checkpoint_consistent(replica_info):
@@ -130,16 +131,31 @@ class olympus(process):
                     send(('wedge',), to=replica)
             else:
                 long_hist = build_longest_history(replica_info)
-                ## Do catch up
-                new_chk_point = chk_pt
-                new_chk_point.update(long_hist)
+                if is_caught_up_consistent(replica_info, long_hist):
+                    new_chk_point = chk_pt
+                    new_chk_point.update(long_hist)
+                    config += 1
+                    for replica in replica_list:
+                        send(('new_configuration', config, chk_pt_ind + 1, new_chk_point,), to=replica)
+                    is_reconfig_in_progress = False
+                else:
+                    incons_hist_replica = {}
+                    for replica in replica_list:
+                        send(('wedge',), to=replica)
 
+    def is_caught_up_consistent(replica_info, long_hist):
+        for ind in replica_info.keys():
+            replica = replica_list[ind]
+            send(('catch_up', long_hist), to=replica)
+        print("Awaitaing for caught up response from ", replica_info.keys())
+        await(len(setof(a, received(('caught_up', _, _,),
+                from_=a))) == len(replica_info))
+        print("Await ended")
 
-                config += 1
-            
-                for replica in replica_list:
-                    send(('new_configuration', config, chk_pt_ind + 1, new_chk_point,), to=replica)
-                is_reconfig_in_progress = False    
+        return True
+
+    def receive(msg=('caught_up', client_no, hash_value)):
+        print("Received caught up from ", client_no)
 
 
     def receive(msg=('req_reconfiguration', client_no)):

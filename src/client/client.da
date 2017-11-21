@@ -87,6 +87,7 @@ class client(process):
         except nacl.exceptions.BadSignatureError:
             return False
         except IndexError:
+            print("Due to reconfiguration, this order is failed")
             return False
 
         qualifier_count = 0
@@ -105,6 +106,7 @@ class client(process):
                 except nacl.exceptions.BadSignatureError:
                     return False
                 except IndexError:
+                    print("Due to reconfiguration, this order is failed")
                     return False
 
                 if result_map[request_id][0] == result_value and qualifier_order == result_order:
