@@ -910,7 +910,7 @@ class replica(process):
                          " replica - ", order_proofs[2], "  sign - ", len(order_proofs[3]))
             print("checkpont return Success ***********************")
         except KeyError:
-            print("Wedge has been received")
+            print("Due to new configuration, client is required to resend this order")
         return
 
     def trigger_failure_injection_for_cl_dr_msg(client_no,

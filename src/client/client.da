@@ -72,17 +72,21 @@ class client(process):
 
     def is_valid_result_proofs(result_proofs, request_id):
         """ Verifying if the result_proof is valid or not. """
-
+        
         if len(result_proofs) < 1:
             return False
 
+
         qualifier_result = result_proofs[0][0]
         qualifier_order = result_proofs[0][1]
-        verify_key = replica_verify_keys[0]
-        
+
         try:
+            verify_key = replica_verify_keys[0]
+
             verify_key.verify(result_proofs[0][3][0])
         except nacl.exceptions.BadSignatureError:
+            return False
+        except IndexError:
             return False
 
         qualifier_count = 0
@@ -99,6 +103,8 @@ class client(process):
                 try:
                     verify_key.verify(result_proof[3][ind])
                 except nacl.exceptions.BadSignatureError:
+                    return False
+                except IndexError:
                     return False
 
                 if result_map[request_id][0] == result_value and qualifier_order == result_order:
@@ -152,11 +158,11 @@ class client(process):
 
     def receive(msg=('result_proof', result_proof, replica_no, request_id)):
         """ Receiving the result_proof from replicas. """
-        logging.info("Received RESULT_PROOF. {RequestId : %s FromReplica: %s" +
+        '''logging.info("Received RESULT_PROOF. {RequestId : %s FromReplica: %s" +
                      " ReplicaNo: %s }, RESULT: { %s }", str(request_id),
                      self.current_replicas_name[int(replica_no)],
                      str(replica_no), result_proof[0][0],
-                     extra=logger.NODE_INFO)
+                     extra=logger.NODE_INFO)'''
 
 
         print ("Order received (by first) -  ", result_proof[0][1])
@@ -240,7 +246,6 @@ class client(process):
                                      str(rep), extra=logger.NODE_INFO)
                         send(('retransmission', self, client_no, request_id,
                               order), to=rep)
-                        print("Hello  ***************")
                         if await(len(setof(a,
                                  received(('retransmission_result', _, _,_),
                                           from_=a))) > 0):
