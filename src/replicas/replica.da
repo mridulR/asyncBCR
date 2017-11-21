@@ -50,15 +50,31 @@ class replica(process):
         self.injected_get_operation = {}
         self.injected_change_result = {}
         self.injected_drop_result = {}
+
+        # Triggers
         self.client_direct_msg_trigger = {}
         self.client_fwd_rqst_trigger = {}
         self.client_shuttle_trigger = {}
         self.client_result_shuttle_trigger = {}
+        self.checkpoint_trigger = {}
+        self.completed_checkpoint_trigger = {}
+        self.wedge_request_trigger = {}
+        self.new_configuration_trigger = {}
+        self.get_running_state_trigger = {}
+        self.catch_up_trigger = {}
+        
+        # Trigger Counter
         self.client_direct_msg_counter = {}
         self.client_fwd_rqst_counter = {}
         self.client_shuttle_counter = {}
         self.client_result_shuttle_counter = {}
-
+        self.checkpoint_counter = 0 
+        self.completed_checkpoint_counter = 0
+        self.wedge_request_counter = 0 
+        self.new_configuration_counter = 0 
+        self.get_running_state_counter = 0 
+        self.catch_up_counter = 0 
+        
         # current_slot updated only by head replica
         self.current_slot = 0
 
@@ -133,6 +149,34 @@ class replica(process):
                          str(non_head_time_out), extra=logger.NODE_INFO)
         return
 
+    def generic_operation_parser(operation):
+        func = {}
+        start = operation.find("(")
+        end = operation.find(")")
+        func["name"] = operation 
+        args = []
+        func["args"] = args
+        if start == -1 or end == -1:
+            print("Expecting a function !!!")
+            return func
+        op_type = operation[:start]
+        func["name"] = op_type
+        args = operation[start+1 : end]
+        args = args.replace(' ', '')
+        args = args.split(',')
+        func["args"] = args
+        return func
+
+    def trigger_parser(trigger):
+        function_list=[]
+        trigger= trigger.replace(' ','')
+        index = trigger.find("),")
+        if index == -1:
+            return function_list 
+        function_list.append(trigger[:index+1])
+        function_list.append(trigger[index+2:])
+        return function_list
+
     def set_failure_triggers():
         """ Setting up the injection point for each replica after reading the
             configuration from the config file.based on configuration. """
@@ -149,21 +193,66 @@ class replica(process):
                     trigger_failures = [each.strip() for each in value.split(';')]
                     for trigg_fail in trigger_failures:
                         if trigg_fail.startswith("client_request"):
-                            cli_msg = re.search(r'client_request\((.*?),(.*?)\),(.*?)\(\)', trigg_fail)
-                            key = cli_msg.group(1) + "_" + cli_msg.group(2)
-                            client_direct_msg_trigger[key] = cli_msg.group(3).strip()
+                            trigger = trigger_parser(trigg_fail) 
+                            trig = generic_operation_parser(trigger[0])
+                            key = trig["args"][0] + "_" + trig["args"][1]
+                            operation = trigger[1]
+                            client_direct_msg_trigger[key] = operation
                         elif trigg_fail.startswith("forwarded_request"):
-                            cli_msg = re.search(r'forwarded_request\((.*?),(.*?)\),(.*?)\(\)', trigg_fail)
-                            key = cli_msg.group(1) + "_" + cli_msg.group(2)
-                            client_fwd_rqst_trigger[key] = cli_msg.group(3).strip()
+                            trigger = trigger_parser(trigg_fail) 
+                            trig = generic_operation_parser(trigger[0])
+                            key = trig["args"][0] + "_" + trig["args"][1]
+                            operation = trigger[1]
+                            client_fwd_rqst_trigger[key] = operation
                         elif trigg_fail.startswith("shuttle"):
-                            cli_msg = re.search(r'shuttle\((.*?),(.*?)\),(.*?)\(\)', trigg_fail)
-                            key = cli_msg.group(1) + "_" + cli_msg.group(2)
-                            client_shuttle_trigger[key] = cli_msg.group(3).strip()
+                            trigger = trigger_parser(trigg_fail) 
+                            trig = generic_operation_parser(trigger[0])
+                            key = trig["args"][0] + "_" + trig["args"][1]
+                            operation = trigger[1]
+                            client_shuttle_trigger[key] = operation
                         elif trigg_fail.startswith("result_shuttle"):
-                            cli_msg = re.search(r'result_shuttle\((.*?),(.*?)\),(.*?)\(\)', trigg_fail)
-                            key = cli_msg.group(1) + "_" + cli_msg.group(2)
-                            client_result_shuttle_trigger[key] = cli_msg.group(3).strip()
+                            trigger = trigger_parser(trigg_fail) 
+                            trig = generic_operation_parser(trigger[0])
+                            key = trig["args"][0] + "_" + trig["args"][1]
+                            operation = trigger[1]
+                            client_result_shuttle_trigger[key] = operation
+                        elif trigg_fail.startswith("checkpoint"):
+                            trigger = trigger_parser(trigg_fail) 
+                            trig = generic_operation_parser(trigger[0])
+                            key = trig["args"][0]
+                            operation = trigger[1]
+                            checkpoint_trigger[key] = operation 
+                        elif trigg_fail.startswith("completed_checkpoint"):
+                            trigger = trigger_parser(trigg_fail) 
+                            trig = generic_operation_parser(trigger[0])
+                            key = trig["args"][0]
+                            operation = trigger[1]
+                            completed_checkpoint_trigger[key] = operation
+                        elif trigg_fail.startswith("wedge_request"):
+                            trigger = trigger_parser(trigg_fail) 
+                            trig = generic_operation_parser(trigger[0])
+                            key = trig["args"][0]
+                            operation = trigger[1]
+                            wedge_request_trigger[key] = operation
+                        elif trigg_fail.startswith("new_configuration"):
+                            trigger = trigger_parser(trigg_fail) 
+                            trig = generic_operation_parser(trigger[0])
+                            key = trig["args"][0]
+                            operation = trigger[1]
+                            new_configuration_trigger[key] = operation
+                        elif trigg_fail.startswith("get_running_state"):
+                            trigger = trigger_parser(trigg_fail) 
+                            trig = generic_operation_parser(trigger[0])
+                            key = trig["args"][0]
+                            operation = trigger[1]
+                            get_running_state_trigger[key] = operation
+                        elif trigg_fail.startswith("catch_up"):
+                            trigger = trigger_parser(trigg_fail) 
+                            trig = generic_operation_parser(trigger[0])
+                            key = trig["args"][0]
+                            operation = trigger[1]
+                            catch_up_trigger[key] = operation 
+
     return
 
     def combine_result_proof(result, order, predecessor_results):
@@ -189,7 +278,7 @@ class replica(process):
         predecessor_orders.append(signed)
         return (slot_no, order_string, replica_no, predecessor_orders)
 
-    def create_order_proof(slot_no, order_string):
+    def create_order_proof(slot_no, order_string, isinjected):
         """ HEAD replica creates the order_proof which is forwarded alongwith
             shuttle to the next replica in chain. Other replica's append their
             order_proof to this and send along the chain. The tail replica
@@ -197,11 +286,15 @@ class replica(process):
             direction. """
 
         tup = (str(slot_no), order_string, str(replica_no))
-        signed = sign_key.sign(str.encode(str(tup)))
+        if isinjected == True:
+            fake_key = nacl.signing.SigningKey.generate()
+            signed = fake_key.sign(str.encode(str(tup)))
+        else:
+            signed = sign_key.sign(str.encode(str(tup)))
         predecessor_order_proofs = [signed]
         return (slot_no, order_string, replica_no, predecessor_order_proofs)
 
-    def create_result_proof(result, order):
+    def create_result_proof(result, order, isinjected):
         """ HEAD replica creates the result_proof which is forwarded alongwith
             shuttle to the next replica in chain. Other replica's append their
             result_proof to this and send along the chain. The tail replica
@@ -210,7 +303,11 @@ class replica(process):
 
         msg = 16 * str.encode(result)
         digest = HASHER(msg, encoder=nacl.encoding.HexEncoder)
-        signed = sign_key.sign(digest)
+        if isinjected == True:
+            fake_key = nacl.signing.SigningKey.generate()
+            signed = fake_key.sign(digest)
+        else:
+            signed = sign_key.sign(digest)
         return (result, order, replica_no, [signed])
 
     def is_valid_result_proof(result_proofs, cal_result):
@@ -358,7 +455,7 @@ class replica(process):
 
                 elif timeout(int(time_out) / 1000):
                     handle_client_req_at_head(client, client_no, order_id,
-                                              order)
+                                              order, None, None)
                     if await(len(cache[order_id]) == 2):
                         send(('retransmission_result', cache[order_id],
                               replica_no, order_id,), to=client)
@@ -369,7 +466,8 @@ class replica(process):
                         logging.info("Request of reconfiguration from head",
                                      extra=logger.NODE_INFO)
             else:
-                handle_client_req_at_head(client, client_no, order_id, order)
+                handle_client_req_at_head(client, client_no, order_id, order,
+                                          None, None)
                 if await(len(cache[order_id]) == 2):
                     send(('retransmission_result', cache[order_id], \
                             replica_no, order_id,), to=client)
@@ -385,7 +483,7 @@ class replica(process):
                   "request")
 
     def handle_client_req_at_head(client, client_no, unique_order_ide,
-                                  order_req):
+                                  order_req, triggers, keys):
         """ Handles the client order request. It assigns a slot to order and
             then create the order_proof and result_proof which is forwarded
             along the chain. """
@@ -395,21 +493,61 @@ class replica(process):
         current_slot += 1
         # No need to verify order proof at head
         order_proofs = []
+        
+        injected_slot = current_slot
+        invalid_order_sign = False
+        invalid_result_sign = False
+        injected_result = None
+        injected_extra_op = None
+        injected_drop_result_statement = None 
+        injected_drop = None
 
+        if triggers != None:
+            if is_slot_injected(triggers, keys ):
+                injected_slot = current_slot + 1
+                logging.info("HEAD incremented slot. { New Current_slot: %s }",
+                              str(injected_slot), extra=logger.NODE_INFO)
+
+            if is_invalid_order_sign_injected(triggers, keys):
+                 invalid_order_sign = True
+
+            if is_invalid_result_sign_injected(triggers, keys):
+                invalid_result_sign = True
+
+            if is_result_injected(triggers, keys):
+                injected_result = "OK"
+            
+            if is_extra_op_injected(triggers, keys ):
+                injected_extra_op = "put('a','a')"
+
+            if is_drop_result_statement_injected(triggers, keys):
+                injected_drop_result_statement = True
+
+            if is_sleep_injected(triggers, keys):
+                print("Sleep injected")
+
+            if is_drop_injected(triggers, keys ):
+                injected_drop = True
+
+            if is_history_truncated_injected(triggers, keys ):
+                print("Truncated History")               
+
+        if injected_extra_op != None:
+            extra_op_ret = command_executor.get_result(injected_extra_op, running_state)
+ 
         # Order proof is a list of tuples (slot, order, replica, [digtal signs
         # of preceding])
-        order_proofs.append(create_order_proof(current_slot, order_req))
+        order_proofs.append(create_order_proof(injected_slot, order_req, invalid_order_sign))
         result = command_executor.get_result(order_req, running_state)
-        injected_result = get_injected_result(client_no, client_shuttle_counter[client_no])
+        #injected_result = get_injected_result(client_no, client_shuttle_counter[client_no])
         if injected_result != None:
             result = injected_result
         if result != None:
             cache[unique_order_ide] = [result]
             result_proof = []
-            result_proof.append(create_result_proof(result, order_req))
+            result_proof.append(create_result_proof(result, order_req, invalid_result_sign))
 
-            if get_injected_drop_stmt(client_no,
-                                      client_shuttle_counter[client_no]):
+            if injected_drop_result_statement != None:
                 result_proof = []
 
             logging.info("HEAD sending FORWARD_SHUTTLE to next replica in " +
@@ -419,8 +557,9 @@ class replica(process):
                          replicas_name[int(replica_no)+1], str(client_no),
                          result, extra=logger.NODE_INFO)
             history.append(order_proofs)
-            send(('forward_shuttle', client, client_no, unique_order_ide,
-                  order_proofs, result_proof,), to=next_r)
+            if injected_drop == None:
+                send(('forward_shuttle', client, client_no, unique_order_ide,
+                      order_proofs, result_proof,), to=next_r)
 
     def set_global_operation(order):
         global_operation = order
@@ -472,7 +611,7 @@ class replica(process):
             elif val == "drop_result_stmt":
                 set_trigger_for_drop_result_stmt(client_no,
                                                  msg_count_by_client)
-
+    
     def extract_slot_order_map_from_history(rep_history):
         slot_order_map = {}
         for list_order_proofs in rep_history:
@@ -658,10 +797,149 @@ class replica(process):
         send(('wedge_resp', replica_no, checkpoint_ind, \
             checkpoint, history, client_last_op), to=olympus)
 
+    def is_order_injected(trigger_type, arg_list ):
+        if "shuttle" in trigger_type or "client_request" in trigger_type:
+            if arg_list[1] in client_direct_msg_trigger:
+                if client_direct_msg_trigger[arg_list[1]].startswith("change_operation"):
+                    return True
+            if  arg_list[0] in client_shuttle_trigger:
+                if client_shuttle_trigger[arg_list[0]].startswith("change_operation"):
+                    return True
+        return False
+
+    def is_result_injected(trigger_type, arg_list ):
+        if "shuttle" in trigger_type or "client_request" in trigger_type:
+            if arg_list[1] in client_direct_msg_trigger:
+                if client_direct_msg_trigger[arg_list[1]].startswith("change_result"):
+                    return True
+            if  arg_list[0] in client_shuttle_trigger:
+                if client_shuttle_trigger[arg_list[0]].startswith("change_result"):
+                    return True
+        return False
+
+    def is_slot_injected(trigger_type, arg_list ):
+        if "shuttle" in trigger_type or "client_request" in trigger_type:
+            if arg_list[1] in client_direct_msg_trigger:
+                if client_direct_msg_trigger[arg_list[1]].startswith("increment_slot"):
+                    logging.info("HEAD will incremented slot. { Current_slot: %s }",
+                                  str(current_slot), extra=logger.NODE_INFO)
+                    return True
+            if  arg_list[0] in client_shuttle_trigger:
+                if client_shuttle_trigger[arg_list[0]].startswith("increment_slot"):
+                    logging.info("HEAD will incremented slot. { Current_slot: %s }",
+                                  str(current_slot), extra=logger.NODE_INFO)
+                    return True
+        return False
+
+    def is_invalid_order_sign_injected(trigger_type, arg_list ):
+        if "shuttle" in trigger_type or "client_request" in trigger_type:
+            if arg_list[1] in client_direct_msg_trigger:
+                if client_direct_msg_trigger[arg_list[1]].startswith("invalid_order_sig"):
+                    return True
+            if  arg_list[0] in client_shuttle_trigger:
+                if client_shuttle_trigger[arg_list[0]].startswith("invalid_order_sig"):
+                    return True
+        return False
+
+    def is_invalid_result_sign_injected(trigger_type, arg_list):
+        if "shuttle" in trigger_type or "client_request" in trigger_type:
+            if arg_list[1] in client_direct_msg_trigger:
+                if client_direct_msg_trigger[arg_list[1]].startswith("invalid_result_sign"):
+                    return True
+            if  arg_list[0] in client_shuttle_trigger:
+                if client_shuttle_trigger[arg_list[0]].startswith("invalid_result_sign"):
+                    return True
+        return False
+
+    def is_extra_op_injected(trigger_type, arg_list ):
+        if "shuttle" in trigger_type or "client_request" in trigger_type:
+            if arg_list[1] in client_direct_msg_trigger:
+                if client_direct_msg_trigger[arg_list[1]].startswith("extra_op"):
+                    return True
+            if  arg_list[0] in client_shuttle_trigger:
+                if client_shuttle_trigger[arg_list[0]].startswith("extra_op"):
+                    return True
+        return False
+
+    def is_drop_result_statement_injected(trigger_type, arg_list ):
+        if "shuttle" in trigger_type or "client_request" in trigger_type:
+            if arg_list[1] in client_direct_msg_trigger:
+                if client_direct_msg_trigger[arg_list[1]].startswith("drop_result_stmt"):
+                    return True
+            if  arg_list[0] in client_shuttle_trigger:
+                if client_shuttle_trigger[arg_list[0]].startswith("drop_result_stmt"):
+                    return True
+        return False
+
+    def is_sleep_injected(trigger_type, arg_list ):
+        if "shuttle" in trigger_type or "client_request" in trigger_type:
+            if arg_list[1] in client_direct_msg_trigger:
+                if client_direct_msg_trigger[arg_list[1]].startswith("sleep"):
+                    func = generic_operation_parser(client_direct_msg_trigger[arg_list[1]])
+                    interval = func["args"][0] 
+                    logging.info("HEAD sleep will be triggered.", extra=logger.NODE_INFO)
+                    time.sleep(int(interval))
+                    logging.info("HEAD sleep completed.", extra=logger.NODE_INFO)
+                    return True
+            if  arg_list[0] in client_shuttle_trigger:
+                if client_shuttle_trigger[arg_list[0]].startswith("sleep"):
+                    func = generic_operation_parser(client_shuttle_trigger[arg_list[0]])
+                    interval = func["args"][0] 
+                    logging.info("HEAD sleep will be triggered.", extra=logger.NODE_INFO)
+                    time.sleep(int(interval))
+                    logging.info("HEAD sleep completed.", extra=logger.NODE_INFO)
+                    return True
+        return False
+
+    def is_drop_injected(trigger_type, arg_list ):
+        if "shuttle" in trigger_type or "client_request" in trigger_type:
+            if arg_list[1] in client_direct_msg_trigger:
+                if client_direct_msg_trigger[arg_list[1]].startswith("drop()"):
+                    return True
+            if  arg_list[0] in client_shuttle_trigger:
+                if client_shuttle_trigger[arg_list[0]].startswith("drop()"):
+                    return True
+        return False
+
+    def is_history_truncated_injected(trigger_type, arg_list ):
+        if "shuttle" in trigger_type or "client_request" in trigger_type:
+            if arg_list[1] in client_direct_msg_trigger:
+                if client_direct_msg_trigger[arg_list[1]].startswith("truncate_history"):
+                    func = generic_operation_parser(client_direct_msg_trigger[arg_list[1]])
+                    count = func["args"][0] 
+                    length = len(history)
+                    logging.info("HEAD history will be truncated by %s entries." +
+                         "{ History: %s, CurrentLength: %s TruncateCount: %s }", str(count), history, 
+                         len(history), str(count), extra=logger.NODE_INFO)
+                    if length > int(count) :
+                        history = history[:length-int(count)]
+                    else:
+                        history = []
+                    logging.info("HEAD new history. { History: %s, New Length: %s  }", 
+                                 history, len(history), extra=logger.NODE_INFO)
+                    return True
+
+            if  arg_list[0] in client_shuttle_trigger:
+                if client_shuttle_trigger[arg_list[0]].startswith("truncate_history"):
+                    func = generic_operation_parser(client_shuttle_trigger[arg_list[0]])
+                    count = func["args"][0] 
+                    length = len(history)
+                    logging.info("HEAD history will be truncated by %s entries." +
+                         "{ History: %s, CurrentLength: %s TruncateCount: %s }", str(count), history, 
+                         len(history), str(count), extra=logger.NODE_INFO)
+                    if length > int(count) :
+                        history = history[:length-int(count)]
+                    else:
+                        history = []
+                    logging.info("HEAD new history. { History: %s, New Length: %s  }", 
+                                 history, len(history), extra=logger.NODE_INFO)
+                    return True
+        return False
 
     # Only head is supposed to handle order request from client
     def receive(msg=('request_order', client, client_no, unique_order_ide,
                      order_req,)):
+
         if self.prev == None:
             #send(('req_reconfiguration', replica_no), to=olympus)
 
@@ -678,24 +956,33 @@ class replica(process):
 
             self.opr_count_chk_pt = self.opr_count_chk_pt + 1
             if self.opr_count_chk_pt % 3 == 0:
+                self.checkpoint_counter = self.checkpoint_counter + 1
                 print("checkpointing counter - ", opr_count_chk_pt)
                 start_check_pointing()
                 if checkpoint_ind == 2:
                     send(('req_reconfiguration', replica_no), to=olympus)
 
+            # Injected code ---- Start
             if client_no not in client_shuttle_counter:
                 client_shuttle_counter[client_no] = 0
             client_shuttle_counter[client_no] += 1
-            # Injected code ---- Start
-            set_global_operation(order_req)
-            trigger_failure_injection_for_shuttle(client_no,
-                                                  client_shuttle_counter
-                                                  [client_no])
-            order = get_injected_operation(client_no,
-                                           client_shuttle_counter[client_no])
+
+            if client_no not in client_direct_msg_counter:
+                client_direct_msg_counter[client_no] = 0
+            client_direct_msg_counter[client_no] += 1
+
+            trigger_types = ["shuttle", "client_request"]
+            order_inj = order_req
+            shuttle_key = str(client_no) + "_" + str(client_shuttle_counter[client_no])
+            client_key  = str(client_no) + "_" + str(client_direct_msg_counter[client_no])
+            if is_order_injected(trigger_types, [shuttle_key, client_key]):
+                order_inj = "get('X')"
+            
             # Injected code -----End
+
             handle_client_req_at_head(client, client_no, unique_order_ide,
-                                      order)
+                                      order_inj, trigger_types, 
+                                      [shuttle_key, client_key])
         else:
 
             logging.info("Only HEAD must take order request from client",
@@ -753,7 +1040,9 @@ class replica(process):
 
                 history.append(order_proofs)
                 cache[unique_order_ide] = [result]
-                predecessor_results = result_proofs[replica_no - 1][3]
+                predecessor_results = []
+                if len(result_proofs) == replica_no:
+                    predecessor_results = result_proofs[replica_no - 1][3]
                 result_proofs.append(combine_result_proof(result, order_req,
                                      predecessor_results))
 
@@ -802,7 +1091,9 @@ class replica(process):
                 if injected_result != None:
                     result = injected_result
                 # Injected code ------ End
-                predecessor_results = result_proofs[replica_no - 1][3]
+                predecessor_results = []
+                if len(result_proofs) == replica_no:
+                    predecessor_results = result_proofs[replica_no - 1][3]
                 result_proofs.append(combine_result_proof(result, order_req,
                                      predecessor_results))
                 cache[unique_order_ide] = [result, result_proofs]
