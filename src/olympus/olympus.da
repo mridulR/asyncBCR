@@ -159,8 +159,11 @@ class olympus(process):
         if client is not None:
             logging.info("Sending CURRENT_CONFIG to : %s", str(client),
                          extra=logger.NODE_INFO)
-            send(('rcv_curr_config', replica_list, replica_name,
-                  replica_verify_keys), to=client)
+            if is_reconfig_in_progress == False:
+                send(('rcv_curr_config', replica_list, replica_name,
+                    replica_verify_keys), to=client)
+            else:
+                send(('rcv_curr_config', [], [], []), to=client)
         else:
             logger.setLogFormatting(self.name + '.log',
                                     logger.getLogDir(), logging.ERROR)

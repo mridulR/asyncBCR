@@ -624,13 +624,12 @@ class replica(process):
             ## TODO: update cache
             current_slot = slot
             
-        current_slot += 1
         self.state = "ACTIVE"
 
 
     def receive(msg=('wedge',), from_=olympus):
         print("wedge statement received from olympus")
-        state = "IMMUTABLE"
+        self.state = "IMMUTABLE"
         send(('wedge_resp', replica_no, checkpoint_ind, \
             checkpoint, history, client_last_op), to=olympus)
 
@@ -856,6 +855,10 @@ class replica(process):
     # Return Shuttle from next
     def receive(msg=('result_shuttle', unique_order_ide, client_no,
                      result_proof_pair,), from_=self.next_r):
+
+        if self.state == "IMMUTABLE":
+            return
+
         if self.next_r != None:
             logging.info("Received REVERSE_SHUTTLE from next replica in " +
                          "chain. { OrderNo: %s, ClientNo: %s Result: %s}",
@@ -871,41 +874,43 @@ class replica(process):
                                               [client_no])
         # Injected code -----End
         print("Received result shuttle from next for - ", unique_order_ide)
-        result_with_proof = cache[unique_order_ide]
-        result_with_proof.append(result_proof_pair)
-        cache[unique_order_ide] = result_with_proof
-        # Injected code ----------- Start
-        injected_result = get_injected_result(client_no,
+        try:
+            result_with_proof = cache[unique_order_ide]
+            result_with_proof.append(result_proof_pair)
+            cache[unique_order_ide] = result_with_proof
+            # Injected code ----------- Start
+            injected_result = get_injected_result(client_no,
                                               client_result_shuttle_counter
                                               [client_no])
-        if injected_result != None:
-            result_proofs = result_proof_pair[1]
-            result_proof_pair = ("OK", result_proofs)
-        if get_injected_drop_stmt(client_no,
+            if injected_result != None:
+                result_proofs = result_proof_pair[1]
+                result_proof_pair = ("OK", result_proofs)
+            if get_injected_drop_stmt(client_no,
                                   client_result_shuttle_counter[client_no]):
-            result_proofs = result_proof_pair[1][1:]
-            result_proof_pair = (result_proof_pair[0], result_proofs)
-        # Injected code ------ End
-        if self.prev != None:
-            logging.info("Sending REVERSE_SHUTTLE to previous replica in " +
-                         "chain. { OrderNo: %s, ClientNo: %s Result: %s }",
-                         str(unique_order_ide), str(client_no),
-                         result_proof_pair[0][0], extra=logger.NODE_INFO)
-            
-            if is_valid_result_proof(result_proof_pair, result_with_proof[0]):
-                send(('result_shuttle', unique_order_ide, client_no,
-                      result_proof_pair,), to=self.prev)
-            else:
-                print("Raise reconfiguration as result proof has exception")
-        print("checkpont Completed ***********************")
-        print(checkpoint_ind, " - ", client_last_op)
-        print(checkpoint)
-        print("History : ")
-        for his in history:
-            for order_proofs in his:
-                print("slot - ", order_proofs[0], " order - ", order_proofs[1],\
-                     " replica - ", order_proofs[2], "  sign - ", len(order_proofs[3]))
-        print("checkpont return Success ***********************")
+                result_proofs = result_proof_pair[1][1:]
+                result_proof_pair = (result_proof_pair[0], result_proofs)
+            # Injected code ------ End
+            if self.prev != None:
+                logging.info("Sending REVERSE_SHUTTLE to previous replica in " +
+                             "chain. { OrderNo: %s, ClientNo: %s Result: %s }",
+                             str(unique_order_ide), str(client_no),
+                             result_proof_pair[0][0], extra=logger.NODE_INFO)
+                if is_valid_result_proof(result_proof_pair, result_with_proof[0]):
+                    send(('result_shuttle', unique_order_ide, client_no,
+                          result_proof_pair,), to=self.prev)
+                else:
+                    print("Raise reconfiguration as result proof has exception")
+            print("checkpont Completed ***********************")
+            print(checkpoint_ind, " - ", client_last_op)
+            print(checkpoint)
+            print("History : ")
+            for his in history:
+                for order_proofs in his:
+                    print("slot - ", order_proofs[0], " order - ", order_proofs[1],\
+                         " replica - ", order_proofs[2], "  sign - ", len(order_proofs[3]))
+            print("checkpont return Success ***********************")
+        except KeyError:
+            print("Wedge has been received")
         return
 
     def trigger_failure_injection_for_cl_dr_msg(client_no,
