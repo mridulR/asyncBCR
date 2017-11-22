@@ -9,6 +9,7 @@ import json
 import nacl.encoding
 import nacl.signing
 import nacl.hash
+import time
 from src.utils import config_parser
 from src.utils import command_executor
 from src.utils import logger
@@ -18,7 +19,7 @@ FAILURES_TO_TOLERATE = "t"
 HEAD_TIMEOUT = "head_timeout"
 NON_HEAD_TIMEOUT = "nonhead_timeout"
 HASHER = nacl.hash.sha256
-
+current_milli_time = lambda: int(round(time.time() * 1000))
 
 class replica(process):
     """ An implementation to handle all the replicas."""
@@ -82,6 +83,13 @@ class replica(process):
 
         # history of replica
         self.history = []
+
+        # Head-Timeout Counter
+        self.head_time_out_counter = {}
+
+        # Non-Head Timeout Counter
+        self.non_head_time_out_counter = {}
+
 
         # Update next and previous replica by each replica
         self.num_of_replicas = len(replicas)
@@ -149,6 +157,13 @@ class replica(process):
         return
 
     def init_triggers_counters():
+
+        # Head-Timeout Counter
+        self.head_time_out_counter = {}
+
+        # Non-Head Timeout Counter
+        self.non_head_time_out_counter = {}
+
         # Triggers
         self.client_direct_msg_trigger = {}
         self.client_fwd_rqst_trigger = {}
@@ -592,6 +607,8 @@ class replica(process):
                          result, extra=logger.NODE_INFO)
             history.append(order_proofs)
             if injected_drop == None:
+                head_time_out_counter[unique_order_ide] = current_milli_time()
+                print("Head current time - ", head_time_out_counter[unique_order_ide])
                 send(('forward_shuttle', client, client_no, unique_order_ide,
                       order_proofs, result_proof,), to=next_r)
 
@@ -911,7 +928,7 @@ class replica(process):
             else:
                 print("checkpointing failed verification, invoke reconfiguration")
 
-    def receive(msg=('new_configuration', config_ind, chk_pt_ind, chk_pt,), from_=olympus):
+    def receive(msg=('new_configuration', config_ind, chk_pt_ind, chk_pt, run_state), from_=olympus):
         print("Received new configuration ======, ", chk_pt)
         self.configuration_num = config_ind
         self.history = []
@@ -923,9 +940,12 @@ class replica(process):
         self.running_state = {}
         #self.cache = {}
 
-        for slot in sorted(checkpoint.keys()):
-            result = command_executor.get_result(checkpoint[slot], running_state)
-            current_slot = slot
+        #for slot in sorted(checkpoint.keys()):
+        #    result = command_executor.get_result(checkpoint[slot], running_state)
+        #    current_slot = slot
+        
+        running_state = run_state
+        current_slot = sorted(checkpoint.keys())[-1]
 
         init_triggers_counters()
         set_failure_triggers()
@@ -1868,6 +1888,8 @@ class replica(process):
                      replicas_name[int(replica_no)-1], extra=logger.NODE_INFO)
 
         if self.next_r != None:
+            non_head_time_out_counter[unique_order_ide] = current_milli_time()
+            print("Non Head current time - ", non_head_time_out_counter[unique_order_ide])
 
             print("Received forward shuttle - ", unique_order_ide)
 
@@ -2175,6 +2197,12 @@ class replica(process):
 
             # Injected code ------ End
             if self.prev != None:
+                time_taken = int(current_milli_time()) - int(non_head_time_out_counter[unique_order_ide])
+                print("Time taken by shuttle ", unique_order_ide, " - ", str(time_taken))
+                if time_taken > int(non_head_time_out):
+                    print("Reconfiguration because of non_head timeout")
+
+
                 logging.info("Sending REVERSE_SHUTTLE to previous replica in " +
                              "chain. { OrderNo: %s, ClientNo: %s Result: %s }",
                              str(unique_order_ide), str(client_no),
@@ -2187,6 +2215,12 @@ class replica(process):
                     print("Raise reconfiguration as result proof has exception")
                     logging.info("Riase reconfiguration request due to result proof MISBEHAVIOUR", 
                                  extra=logger.NODE_INFO)
+            else:
+                time_taken = int(current_milli_time()) - int(head_time_out_counter[unique_order_ide])
+                print("Time taken by shuttle ", unique_order_ide, " - ", str(time_taken))
+                if time_taken > int(head_time_out):
+                    print("Reconfiguration because of head timeout")
+
             print("checkpont Completed ***********************")
             print(checkpoint_ind, " - ", client_last_op)
             print(checkpoint)

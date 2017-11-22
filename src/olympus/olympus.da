@@ -128,9 +128,11 @@ class olympus(process):
                 if is_caught_up_consistent(replica_info, long_hist) and get_running_state() != None:
                     new_chk_point = chk_pt
                     new_chk_point.update(long_hist)
+                    running_state = get_running_state()
                     config += 1
                     for replica in replica_list:
-                        send(('new_configuration', config, chk_pt_ind + 1, new_chk_point,), to=replica)
+                        send(('new_configuration', config, chk_pt_ind + 1, \
+                                new_chk_point, running_state,), to=replica)
                     print("Awaiting new configuration accepted")    
                     length = ( 2 * quorum_size ) + 1
                     replica_info = {}
