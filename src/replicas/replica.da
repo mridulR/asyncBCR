@@ -213,8 +213,6 @@ class replica(process):
                 config_num = int(config_replica.group(1))
                 replica = int(config_replica.group(2))
 
-                print("Helllllllllllllllllllll -   ", config_num)
-
                 if config_num == configuration_num and replica == replica_no:
                     trigger_failures = [each.strip() for each in value.split(';')]
                     for trigg_fail in trigger_failures:
@@ -485,11 +483,13 @@ class replica(process):
 
                 elif order_id in cache and len(cache[order_id]) == 1:
                     if await(len(cache[order_id]) == 2):
+                        print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
                         send(('retransmission_result', cache[order_id],
                              replica_no, order_id,), to=client)
                         send(('retransmission_ack', order_id), to=replica)
 
                     elif timeout(int(time_out) / 1000):
+                        print("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
                         handle_client_req_at_head(client, client_no, order_id,
                                                   order, None, None)
                         if await(len(cache[order_id]) == 2):
@@ -501,24 +501,24 @@ class replica(process):
                             print("Request of reconfiguration from head")
                             logging.info("Request of reconfiguration from head",
                                          extra=logger.NODE_INFO)
-                    else:
-                        handle_client_req_at_head(client, client_no, order_id, order,
-                                                 None, None)
-                        if await(len(cache[order_id]) == 2):
-                            send(('retransmission_result', cache[order_id], \
-                                    replica_no, order_id,), to=client)
-                            send(('retransmission_ack', order_id), to=replica)
-
-                        elif timeout(int(time_out) / 1000):
-                            print("Request of reconfiguration from head")
-                            logging.info("Request of reconfiguration from head", \
-                                                        extra=logger.NODE_INFO)
-
                 else:
-                    print("Only head has to eventually deal with re transmission" +
-                      "request")
-            except IndexError:
+                    print("CCCCCCCCCCCCCCCCCCCCCCCCCCCC")
+                    handle_client_req_at_head(client, client_no, order_id, order,
+                                             None, None)
+                    if await(len(cache[order_id]) == 2):
+                        send(('retransmission_result', cache[order_id], \
+                                replica_no, order_id,), to=client)
+                        send(('retransmission_ack', order_id), to=replica)
+
+                    elif timeout(int(time_out) / 1000):
+                        print("Request of reconfiguration from head")
+                        logging.info("Request of reconfiguration from head", \
+                                                    extra=logger.NODE_INFO)
+        
+            except KeyError:
                 print("Cache was reset during reconfig, hence client should retry")
+        else:
+            print("Only head has to eventually deal with re transmission request")
 
     def handle_client_req_at_head(client, client_no, unique_order_ide,
                                   order_req, triggers, keys):
@@ -527,8 +527,10 @@ class replica(process):
             along the chain. """
 
         print("Received order request at head : ", order_req)
+        
+        if triggers != None:
+            current_slot += 1
 
-        current_slot += 1
         # No need to verify order proof at head
         order_proofs = []
 
@@ -1137,8 +1139,6 @@ class replica(process):
 
             print("Received forward shuttle - ", unique_order_ide)
 
-            if state == "IMMUTABLE":
-                return
 
             # Injected code ---- Start
             if client_no not in client_shuttle_counter:
@@ -1187,7 +1187,11 @@ class replica(process):
             # Injected code ----------- End
 
             if is_valid_order_proofs(order_proofs):
-                current_slot, order_req = get_slot_order(order_proofs)
+                rcv_current_slot, order_req = get_slot_order(order_proofs)
+
+                '''if rcv_current_slot != current_slot + 1:
+                    print("Slot se cher char hua hai !!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                    send(('req_reconfiguration', replica_no), to=olympus)'''
 
                 client_last_op[client_no] = order_req
 
@@ -1196,7 +1200,7 @@ class replica(process):
                     order_inj = "get('X')"
 
                 predecessor_order_proof = order_proofs[replica_no - 1][3]
-                order_proofs.append(combine_order_proof(current_slot,
+                order_proofs.append(combine_order_proof(rcv_current_slot,
                                     order_inj, predecessor_order_proof, invalid_order_sign))
                 result = command_executor.get_result(order_inj, running_state)
 
