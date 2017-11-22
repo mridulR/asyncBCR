@@ -483,13 +483,11 @@ class replica(process):
 
                 elif order_id in cache and len(cache[order_id]) == 1:
                     if await(len(cache[order_id]) == 2):
-                        print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
                         send(('retransmission_result', cache[order_id],
                              replica_no, order_id,), to=client)
                         send(('retransmission_ack', order_id), to=replica)
 
                     elif timeout(int(time_out) / 1000):
-                        print("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
                         handle_client_req_at_head(client, client_no, order_id,
                                                   order, None, None)
                         if await(len(cache[order_id]) == 2):
@@ -502,7 +500,6 @@ class replica(process):
                             logging.info("Request of reconfiguration from head",
                                          extra=logger.NODE_INFO)
                 else:
-                    print("CCCCCCCCCCCCCCCCCCCCCCCCCCCC")
                     handle_client_req_at_head(client, client_no, order_id, order,
                                              None, None)
                     if await(len(cache[order_id]) == 2):
@@ -528,8 +525,7 @@ class replica(process):
 
         print("Received order request at head : ", order_req)
         
-        if triggers != None:
-            current_slot += 1
+        current_slot = current_slot + 1
 
         # No need to verify order proof at head
         order_proofs = []
@@ -837,6 +833,10 @@ class replica(process):
         send(('caught_up', replica_no, digest), to=olympus)
 
 
+    def receive(msg=('activate',), from_=olympus):
+        self.state = "ACTIVE"
+        print("Setting state as active")
+        send(('ack_activate',replica_no), to=olympus)
 
     def receive(msg=('wedge',), from_=olympus):
         print("wedge statement received from olympus")
@@ -1094,7 +1094,7 @@ class replica(process):
             if self.opr_count_chk_pt % 3 == 0:
                 self.checkpoint_counter = self.checkpoint_counter + 1
                 #print("checkpointing counter - ", opr_count_chk_pt)
-                #start_check_pointing()
+                start_check_pointing()
                 #if checkpoint_ind == 2:
                 #    send(('req_reconfiguration', replica_no), to=olympus)
 
@@ -1189,7 +1189,7 @@ class replica(process):
             if is_valid_order_proofs(order_proofs):
                 rcv_current_slot, order_req = get_slot_order(order_proofs)
 
-                '''if rcv_current_slot != current_slot + 1:
+                '''if rcv_current_slot - current_slot > 1:
                     print("Slot se cher char hua hai !!!!!!!!!!!!!!!!!!!!!!!!!!!")
                     send(('req_reconfiguration', replica_no), to=olympus)'''
 

@@ -175,8 +175,15 @@ class olympus(process):
         print("Reconfiguration  request received from ", replica_no)
         for replica in replica_list:
             send(('wedge',), to=replica)
-        await(len(setof(a, received(('wedge_resp', _, _,_,_,_), from_=a))) == quorum_size)
+        await(len(setof(a, received(('wedge_resp', _, _,_,_,_), from_=a))) >= quorum_size)
+        for replica in replica_list:
+            send(('activate',), to=replica)
+        print("Awaiting activation ack")
+        await(len(setof(a, received(('ack_activate', _), from_=a))) == len(replica_list))
         return
+
+    def receive(msg=('ack_activate', replica_no)):
+        print("Rcv activate acknowledgement from client - ", replica_no)
 
     def receive(msg=('req_curr_config', client)):
         """ Receives the CURRENT_CONFIG request from client. """
