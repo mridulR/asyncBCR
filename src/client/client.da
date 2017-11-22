@@ -170,6 +170,7 @@ class client(process):
                      extra=logger.NODE_INFO)'''
 
         print ("Order received (by first) -  ", result_proof[0][1])
+        print ("Order received (by second) -  ", result_proof[1][0])
         print ("Result received (by first) -  ", result_proof[0][0])
         print ("Request id - ", request_id, "No of replies -  ", len(result_proof))
         if verify_result_proof(result_proof, request_id) == False:
