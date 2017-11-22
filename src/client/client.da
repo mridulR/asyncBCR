@@ -76,14 +76,11 @@ class client(process):
 
         if len(result_proofs) < 1:
             return False
-
-
         qualifier_result = result_proofs[0][0]
         qualifier_order = result_proofs[0][1]
 
         try:
             verify_key = replica_verify_keys[0]
-
             verify_key.verify(result_proofs[0][3][0])
         except nacl.exceptions.BadSignatureError:
             print("Due to signature mismach, this order is failed")
@@ -122,7 +119,7 @@ class client(process):
                         qualifier_result = result_value
                         qualifier_count = 1
             except IndexError:
-                break
+                return False
 
         qualifier_count = 0
         for rslt_proof in result_proofs:
@@ -170,8 +167,11 @@ class client(process):
                      extra=logger.NODE_INFO)'''
 
         print ("Order received (by first) -  ", result_proof[0][1])
-        print ("Order received (by second) -  ", result_proof[1][0])
+        print ("Order received (by second) -  ", result_proof[1][1])
+        print ("Order received (by third) -  ", result_proof[2][1])
         print ("Result received (by first) -  ", result_proof[0][0])
+        print ("Result received (by second) -  ", result_proof[1][0])
+        print ("Result received (by third) -  ", result_proof[2][0])
         print ("Request id - ", request_id, "No of replies -  ", len(result_proof))
         if verify_result_proof(result_proof, request_id) == False:
             print("Retransmitting requestId - ", request_id, " and order - ", result_map[request_id][1])
