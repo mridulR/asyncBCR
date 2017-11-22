@@ -1197,7 +1197,85 @@ class replica(process):
                     return True
         return False
 
+    def is_order_injected_rs_tail(trigger_type, arg_list ):
+        if "result_shuttle" in trigger_type:
+            if arg_list[0] in client_result_shuttle_trigger:
+                if client_result_shuttle_trigger[arg_list[1]].startswith("change_operation"):
+                    return True
+        return False
 
+    def is_result_injected_rs_tail(trigger_type, arg_list ):
+        if  "result_shuttle" in trigger_type:
+            if arg_list[0] in client_result_shuttle_trigger:
+                if client_result_shuttle_trigger[arg_list[1]].startswith("change_result"):
+                    return True
+        return False
+
+    def is_invalid_order_sign_injected_rs_tail(trigger_type, arg_list ):
+        if "result_shuttle" in trigger_type:
+            if arg_list[0] in client_result_shuttle_trigger:
+                if client_result_shuttle_trigger[arg_list[1]].startswith("invalid_order_sig"):
+                    return True
+        return False
+
+    def is_invalid_result_sign_injected_rs_tail(trigger_type, arg_list):
+        if "result_shuttle" in trigger_type:
+            if arg_list[0] in client_result_shuttle_trigger:
+                if client_result_shuttle_trigger[arg_list[1]].startswith("invalid_result_sign"):
+                    return True
+        return False
+
+    def is_extra_op_injected_rs_tail(trigger_type, arg_list ):
+        if "result_shuttle" in trigger_type:
+            if arg_list[0] in client_result_shuttle_trigger:
+                if client_result_shuttle_trigger[arg_list[1]].startswith("extra_op"):
+                    return True
+        return False
+
+    def is_drop_result_statement_injected_rs_tail(trigger_type, arg_list ):
+        if "result_shuttle" in trigger_type:
+            if arg_list[0] in client_result_shuttle_trigger:
+                if client_result_shuttle_trigger[arg_list[1]].startswith("drop_result_stmt"):
+                    return True
+        return False
+
+    def is_sleep_injected_rs_tail(trigger_type, arg_list ):
+        if "result_shuttle" in trigger_type:
+            if arg_list[0] in client_result_shuttle_trigger:
+                if client_result_shuttle_trigger[arg_list[1]].startswith("sleep"):
+                    func = generic_operation_parser(client_result_shuttle_trigger[arg_list[1]])
+                    interval = func["args"][0]
+                    logging.info("Replica sleep will be triggered.", extra=logger.NODE_INFO)
+                    time.sleep(int(interval))
+                    logging.info("Replica sleep completed.", extra=logger.NODE_INFO)
+                    return True
+        return False
+
+    def is_drop_injected_rs_tail(trigger_type, arg_list ):
+        if "result_shuttle" in trigger_type:
+            if arg_list[0] in client_result_shuttle_trigger:
+                if client_result_shuttle_trigger[arg_list[1]].startswith("drop()"):
+                    return True
+        return False
+
+    def is_history_truncated_injected_rs_tail(trigger_type, arg_list ):
+        if "result_shuttle" in trigger_type:
+            if arg_list[0] in client_result_shuttle_trigger:
+                if client_result_shuttle_trigger[arg_list[1]].startswith("truncate_history"):
+                    func = generic_operation_parser(client_result_shuttle_trigger[arg_list[1]])
+                    count = func["args"][0]
+                    length = len(history)
+                    logging.info("Replica history will be truncated by %s entries." +
+                         "{ CurrentLength: %s TruncateCount: %s }", str(count),
+                         len(history), str(count), extra=logger.NODE_INFO)
+                    if length > int(count) :
+                        history = history[:length-int(count)]
+                    else:
+                        history = []
+                    logging.info("HEAD new history. { New Length: %s  }",
+                                 len(history), extra=logger.NODE_INFO)
+                    return True
+        return False
 
     # Only head is supposed to handle order request from client
     def receive(msg=('request_order', client, client_no, unique_order_ide,
@@ -1497,27 +1575,77 @@ class replica(process):
         if client_no not in client_result_shuttle_counter:
             client_result_shuttle_counter[client_no] = 0
         client_result_shuttle_counter[client_no] += 1
-        # Injected code ---- Start
-        trigger_failure_injection_for_shuttle(client_no,
-                                              client_result_shuttle_counter
-                                              [client_no])
-        # Injected code -----End
+        
+        result_key = str(client_no) + "_" + str(client_result_shuttle_counter[client_no])
+
+        triggers = ["result_shuttle"]
+        keys = [result_key]
+
+        print("Received forward shuttle - ", unique_order_ide)
+
+        # Injection Code Start
+        invalid_order_sign = False
+        invalid_result_sign = False
+        injected_result = None
+        injected_extra_op = None
+        injected_drop_result_statement = None
+        injected_drop = None
+
+        if triggers != None:
+
+            if is_invalid_order_sign_injected_rs_tail(triggers, keys):
+                 invalid_order_sign = True
+
+            if is_invalid_result_sign_injected_rs_tail(triggers, keys):
+                invalid_result_sign = True
+
+            if is_result_injected_rs_tail(triggers, keys):
+                injected_result = "OK"
+
+            if is_extra_op_injected_rs_tail(triggers, keys ):
+                injected_extra_op = "put('a','a')"
+
+            if is_drop_result_statement_injected_rs_tail(triggers, keys):
+                injected_drop_result_statement = True
+
+            if is_sleep_injected_rs_tail(triggers, keys):
+                print("Sleep injected")
+
+            if is_drop_injected_rs_tail(triggers, keys ):
+                injected_drop = True
+
+            if is_history_truncated_injected_rs_tail(triggers, keys ):
+                print("Truncated History")
+
+        if injected_extra_op != None:
+            extra_op_ret = command_executor.get_result(injected_extra_op, running_state)
+
+        # Injected code ----------- End
+            
         print("Received result shuttle from next for - ", unique_order_ide)
         try:
             result_with_proof = cache[unique_order_ide]
+            msg = 16 * str.encode(result_with_proof[0])
+            digest = HASHER(msg, encoder=nacl.encoding.HexEncoder)
+
             result_with_proof.append(result_proof_pair)
             cache[unique_order_ide] = result_with_proof
+
             # Injected code ----------- Start
-            injected_result = get_injected_result(client_no,
-                                              client_result_shuttle_counter
-                                              [client_no])
             if injected_result != None:
                 result_proofs = result_proof_pair[1]
                 result_proof_pair = ("OK", result_proofs)
-            if get_injected_drop_stmt(client_no,
-                                  client_result_shuttle_counter[client_no]):
+
+            if injected_drop_result_statement != None: 
                 result_proofs = result_proof_pair[1][1:]
                 result_proof_pair = (result_proof_pair[0], result_proofs)
+
+            if invalid_result_sign != None:
+                fake_key = nacl.signing.SigningKey.generate()
+                signed = fake_key.sign(digest)
+                result_proof_pair = result_proof_pair[:int(replica_no)] + result_proof_pair[int(replica_no)+1:]
+                result_proof_pair = result_proof_pair[:int(replica_no)] + [signed] + result_proof_pair[int(replica_no):]
+
             # Injected code ------ End
             if self.prev != None:
                 logging.info("Sending REVERSE_SHUTTLE to previous replica in " +
@@ -1525,8 +1653,9 @@ class replica(process):
                              str(unique_order_ide), str(client_no),
                              result_proof_pair[0][0], extra=logger.NODE_INFO)
                 if is_valid_result_proof(result_proof_pair, result_with_proof[0]):
-                    send(('result_shuttle', unique_order_ide, client_no,
-                          result_proof_pair,), to=self.prev)
+                    if injected_drop == None:
+                        send(('result_shuttle', unique_order_ide, client_no,
+                              result_proof_pair,), to=self.prev)
                 else:
                     print("Raise reconfiguration as result proof has exception")
                     logging.info("Riase reconfiguration request due to result proof MISBEHAVIOUR", 
