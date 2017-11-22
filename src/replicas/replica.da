@@ -34,7 +34,7 @@ class replica(process):
         self.state = "ACTIVE"
 
         # configuration of replica
-        self.config = 0
+        self.configuration_num = 0
 
 
         # cache for storing result and result proof
@@ -149,6 +149,31 @@ class replica(process):
                          str(non_head_time_out), extra=logger.NODE_INFO)
         return
 
+    def init_triggers_counters():
+        # Triggers
+        self.client_direct_msg_trigger = {}
+        self.client_fwd_rqst_trigger = {}
+        self.client_shuttle_trigger = {}
+        self.client_result_shuttle_trigger = {}
+        self.checkpoint_trigger = {}
+        self.completed_checkpoint_trigger = {}
+        self.wedge_request_trigger = {}
+        self.new_configuration_trigger = {}
+        self.get_running_state_trigger = {}
+        self.catch_up_trigger = {}
+
+        # Trigger Counter
+        self.client_direct_msg_counter = {}
+        self.client_fwd_rqst_counter = {}
+        self.client_shuttle_counter = {}
+        self.client_result_shuttle_counter = {}
+        self.checkpoint_counter = 0
+        self.completed_checkpoint_counter = 0
+        self.wedge_request_counter = 0
+        self.new_configuration_counter = 0
+        self.get_running_state_counter = 0
+        self.catch_up_counter = 0
+
     def generic_operation_parser(operation):
         func = {}
         start = operation.find("(")
@@ -185,11 +210,12 @@ class replica(process):
             trigger_failure_list = []
             if key.startswith('failures'):
                 config_replica = re.search(r'\[(.*?),(.*?)\]', key)
-                config = int(config_replica.group(1))
+                config_num = int(config_replica.group(1))
                 replica = int(config_replica.group(2))
 
-                # In phase 2 only concerned with config 0
-                if config == 0 and replica == replica_no:
+                print("Helllllllllllllllllllll -   ", config_num)
+
+                if config_num == configuration_num and replica == replica_no:
                     trigger_failures = [each.strip() for each in value.split(';')]
                     for trigg_fail in trigger_failures:
                         if trigg_fail.startswith("client_request"):
@@ -437,50 +463,52 @@ class replica(process):
             print('Retransmission request forwarded from replica ......')
             logging.info("Retransmission request forwarded from replica" +
                          "......", extra=logger.NODE_INFO)
+            try:
+                if order_id in cache and len(cache[order_id]) == 2:
+                    send(('retransmission_result', cache[order_id], replica_no, order_id,),
+                         to=client)
 
-            if order_id in cache and len(cache[order_id]) == 2:
-                send(('retransmission_result', cache[order_id], replica_no, order_id,),
-                     to=client)
+                    logging.info("Sending retransmission_ack ACK: {orderId: %s}",
+                                 str(order_id), extra=logger.NODE_INFO)
 
-                logging.info("Sending retransmission_ack ACK: {orderId: %s}",
-                             str(order_id), extra=logger.NODE_INFO)
-
-                send(('retransmission_ack', order_id), to=replica)
-
-            elif order_id in cache and len(cache[order_id]) == 1:
-                if await(len(cache[order_id]) == 2):
-                    send(('retransmission_result', cache[order_id],
-                         replica_no, order_id,), to=client)
                     send(('retransmission_ack', order_id), to=replica)
 
-                elif timeout(int(time_out) / 1000):
-                    handle_client_req_at_head(client, client_no, order_id,
-                                              order, None, None)
+                elif order_id in cache and len(cache[order_id]) == 1:
                     if await(len(cache[order_id]) == 2):
                         send(('retransmission_result', cache[order_id],
-                              replica_no, order_id,), to=client)
+                             replica_no, order_id,), to=client)
                         send(('retransmission_ack', order_id), to=replica)
 
                     elif timeout(int(time_out) / 1000):
-                        print("Request of reconfiguration from head")
-                        logging.info("Request of reconfiguration from head",
-                                     extra=logger.NODE_INFO)
-            else:
-                handle_client_req_at_head(client, client_no, order_id, order,
-                                          None, None)
-                if await(len(cache[order_id]) == 2):
-                    send(('retransmission_result', cache[order_id], \
-                            replica_no, order_id,), to=client)
-                    send(('retransmission_ack', order_id), to=replica)
+                        handle_client_req_at_head(client, client_no, order_id,
+                                                  order, None, None)
+                        if await(len(cache[order_id]) == 2):
+                            send(('retransmission_result', cache[order_id],
+                                  replica_no, order_id,), to=client)
+                            send(('retransmission_ack', order_id), to=replica)
 
-                elif timeout(int(time_out) / 1000):
-                    print("Request of reconfiguration from head")
-                    logging.info("Request of reconfiguration from head", \
+                        elif timeout(int(time_out) / 1000):
+                            print("Request of reconfiguration from head")
+                            logging.info("Request of reconfiguration from head",
+                                         extra=logger.NODE_INFO)
+                    else:
+                        handle_client_req_at_head(client, client_no, order_id, order,
+                                                 None, None)
+                        if await(len(cache[order_id]) == 2):
+                            send(('retransmission_result', cache[order_id], \
+                                    replica_no, order_id,), to=client)
+                            send(('retransmission_ack', order_id), to=replica)
+
+                        elif timeout(int(time_out) / 1000):
+                            print("Request of reconfiguration from head")
+                            logging.info("Request of reconfiguration from head", \
                                                         extra=logger.NODE_INFO)
 
-        else:
-            print("Only head has to eventually deal with re transmission" +
-                  "request")
+                else:
+                    print("Only head has to eventually deal with re transmission" +
+                      "request")
+            except IndexError:
+                print("Cache was reset during reconfig, hence client should retry")
 
     def handle_client_req_at_head(client, client_no, unique_order_ide,
                                   order_req, triggers, keys):
@@ -748,7 +776,7 @@ class replica(process):
 
     def receive(msg=('new_configuration', config_ind, chk_pt_ind, chk_pt,), from_=olympus):
         print("Received new configuration ======, ", chk_pt)
-        self.config = config_ind
+        self.configuration_num = config_ind
         self.history = []
         self.opr_count_chk_pt = 0
         self.checkpoint_ind = chk_pt_ind
@@ -756,14 +784,21 @@ class replica(process):
         self.client_last_op = {}
         self.current_slot = 0
         self.running_state = {}
-        self.cache = {}
+        #self.cache = {}
 
         for slot in sorted(checkpoint.keys()):
             result = command_executor.get_result(checkpoint[slot], running_state)
-            ## TODO: update cache
             current_slot = slot
 
+        init_triggers_counters()
+        set_failure_triggers()
+        print("Resetting triggers")
+        
+
         self.state = "ACTIVE"
+        print("sending new config ack to olympus")
+        send(('new_config_done', replica_no), to=olympus)
+        self.cache = {}
 
     def build_slot_order_map(history):
         slot_order_map = {}
@@ -788,6 +823,7 @@ class replica(process):
         msg = 16 * str.encode(catched_hist_str)
         digest = HASHER(msg, encoder=nacl.encoding.HexEncoder)
         send(('caught_up', replica_no, digest), to=olympus)
+
 
 
     def receive(msg=('wedge',), from_=olympus):
@@ -956,10 +992,10 @@ class replica(process):
             self.opr_count_chk_pt = self.opr_count_chk_pt + 1
             if self.opr_count_chk_pt % 3 == 0:
                 self.checkpoint_counter = self.checkpoint_counter + 1
-                print("checkpointing counter - ", opr_count_chk_pt)
-                start_check_pointing()
-                if checkpoint_ind == 2:
-                    send(('req_reconfiguration', replica_no), to=olympus)
+                #print("checkpointing counter - ", opr_count_chk_pt)
+                #start_check_pointing()
+                #if checkpoint_ind == 2:
+                #    send(('req_reconfiguration', replica_no), to=olympus)
 
             # Injected code ---- Start
             if client_no not in client_shuttle_counter:
@@ -1171,9 +1207,6 @@ class replica(process):
     def receive(msg=('result_shuttle', unique_order_ide, client_no,
                      result_proof_pair,), from_=self.next_r):
 
-        if self.state == "IMMUTABLE":
-            return
-
         if self.next_r != None:
             logging.info("Received REVERSE_SHUTTLE from next replica in " +
                          "chain. { OrderNo: %s, ClientNo: %s Result: %s}",
@@ -1286,10 +1319,16 @@ class replica(process):
                          "result. {RESULT: %s , FromReplica: %s ToClient: %s}",
                          result_proof_pair[0], str(replica_no), str(client_no),
                          extra=logger.NODE_INFO)
+            
+            if order_req == cache[order_id]:
+                print("sending retransmission respose from cache for - ", order_id)
 
-            print("sending retransmission respose from cache for - ", order_id)
-            send(('retransmission_result', result_proof_pair, replica_no, order_id,),
+                send(('retransmission_result', result_proof_pair, replica_no, order_id,),
                  to=client)
+            else:
+                print("***************************************************")
+                print("This order was changed, hence reconfiguration")
+                send(('req_reconfiguration', replica_no), to=olympus)
         else:
             logging.info("Retransmission request send to HEAD. {OrderNo: %s" +
                          "OrderRequest: %s ClientNo: %s ClientId: %s}",

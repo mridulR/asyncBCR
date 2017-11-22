@@ -7,12 +7,14 @@ import logging
 from src.utils import logger
 import nacl.encoding
 import nacl.signing
+import time
 
 
 # Configuration Params to be read from config file
 
 HOST = 'olympus_host'
 
+current_milli_time = lambda: int(round(time.time() * 1000))
 
 class olympus(process):
     """ An implementation to handle the singleton Olympus. """
@@ -42,7 +44,6 @@ class olympus(process):
 
         self.is_reconfig_in_progress = False
         self.replica_info = {}
-        self.incons_hist_replica = {}
         self.config = 0
         self.consistent_caught_up = {}
         return
@@ -107,21 +108,10 @@ class olympus(process):
 
     def receive(msg=('wedge_resp', replica_no, chk_pt_ind, chk_pt, hist, client_ord)):
         print("Reconfiguration  response received from ", replica_no)
-
-        if is_reconfig_in_progress == False:
-            replica_info = {}
+        if len(replica_info) == 0:
             config += 1
-            is_reconfig_in_progress = True
-
-        if replica_no in incons_hist_replica:
-            print ("Ignoring - ", replica_no, " because of inconsistent history")
-            return
 
         replica_info[replica_no] = (chk_pt_ind, chk_pt, hist, client_ord)
-
-        if len(incons_hist_replica) >= quorum_size:
-            print("System has t + 1 failures hence broken - ", incons_hist_replica)
-            return
 
         if len(replica_info) == quorum_size:
             print("quorum replica - ", replica_info.keys())
@@ -129,6 +119,7 @@ class olympus(process):
                 is_reconfig_in_progress = False
                 for replica in replica_list:
                     send(('wedge',), to=replica)
+                await(len(setof(a, received(('wedge_resp', _, _,_,_,_), from_=a))) == quorum_size)
             else:
                 long_hist = build_longest_history(replica_info)
                 if is_caught_up_consistent(replica_info, long_hist):
@@ -137,11 +128,21 @@ class olympus(process):
                     config += 1
                     for replica in replica_list:
                         send(('new_configuration', config, chk_pt_ind + 1, new_chk_point,), to=replica)
+                    print("Awaiting new configuration accepted")    
+                    length = ( 2 * quorum_size ) + 1
+                    replica_info = {}
+                    await(len(setof(a, received(('new_config_done',_,), from_=a))) == length)
+                    replica_info = {}
                     is_reconfig_in_progress = False
                 else:
-                    incons_hist_replica = {}
+                    is_reconfig_in_progress = False
                     for replica in replica_list:
                         send(('wedge',), to=replica)
+                    await(len(setof(a, received(('wedge_resp', _, _,_,_,_), from_=a))) == quorum_size)
+
+        is_reconfig_in_progress = False
+        return
+
 
     def is_caught_up_consistent(replica_info, long_hist):
         consistent_caught_up = {}
@@ -149,30 +150,33 @@ class olympus(process):
             replica = replica_list[ind]
             send(('catch_up', long_hist), to=replica)
         print("Awaitaing for caught up response from ", replica_info.keys())
-        await(len(setof(a, received(('caught_up', _, _,), from_=a))) == len(replica_info))
+        await(len(setof(a, received(('caught_up', _, _), from_=a))) == quorum_size)
         print("Await ended")
         hash_value = ""
-        for key in replica_info.keys():
+        for key in consistent_caught_up.keys():
             if len(hash_value) == 0:
                 hash_value = consistent_caught_up[key]
-                continue
-            if hash_value != consistent_caught_up[key]:
+            elif hash_value != consistent_caught_up[key]:
                 return False
         return True
+
+
+    def receive(msg=('new_config_done', client_no)):
+        print("New config done for ", client_no)
 
     def receive(msg=('caught_up', client_no, hash_value)):
         consistent_caught_up[client_no] = hash_value
         print("Received caught up from ", client_no, " is - ", hash_value)
 
-
-    def receive(msg=('req_reconfiguration', client_no)):
-        print("Reconfiguration  request received from ", client_no)
-        if is_reconfig_in_progress == False:
-            incons_hist_replica = {}
-            for replica in replica_list:
-                send(('wedge',), to=replica)
-        else:
-            print("Reconfig is already in progress")
+    def receive(msg=('req_reconfiguration', replica_no)):
+        if is_reconfig_in_progress == True:
+            return
+        is_reconfig_in_progress = True
+        print("Reconfiguration  request received from ", replica_no)
+        for replica in replica_list:
+            send(('wedge',), to=replica)
+        await(len(setof(a, received(('wedge_resp', _, _,_,_,_), from_=a))) == quorum_size)
+        return
 
     def receive(msg=('req_curr_config', client)):
         """ Receives the CURRENT_CONFIG request from client. """

@@ -36,7 +36,6 @@ workload[0] = put('movie','star'); append('movie',' wars'); get('movie'); put('j
 # failure scenario are failure-free.
 failures[0,0] = shuttle(0,2), change_operation()
 
-
 #### Additional config parameters
 secret = 1234
 olympus_host = 0

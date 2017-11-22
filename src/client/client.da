@@ -64,11 +64,12 @@ class client(process):
             print("Result proof verification passed")
             logging.info("Result proof verification PASS - RESULT: {" +
                          " %s }", result_proofs[0][0], extra=logger.NODE_INFO)
+            return True
         else:
             print("Result proof verification failed")
             logging.info("Result proof verification FAIL - RESULT: {" +
                          " %s }", result_proofs[0][0], extra=logger.NODE_INFO)
-        return
+        return False
 
     def is_valid_result_proofs(result_proofs, request_id):
         """ Verifying if the result_proof is valid or not. """
@@ -85,6 +86,7 @@ class client(process):
 
             verify_key.verify(result_proofs[0][3][0])
         except nacl.exceptions.BadSignatureError:
+            print("Due to signature mismach, this order is failed")
             return False
         except IndexError:
             print("Due to reconfiguration, this order is failed")
@@ -104,6 +106,7 @@ class client(process):
                 try:
                     verify_key.verify(result_proof[3][ind])
                 except nacl.exceptions.BadSignatureError:
+                    print("Due to signature mismach, this order is failed")
                     return False
                 except IndexError:
                     print("Due to reconfiguration, this order is failed")
@@ -166,19 +169,22 @@ class client(process):
                      str(replica_no), result_proof[0][0],
                      extra=logger.NODE_INFO)'''
 
-
         print ("Order received (by first) -  ", result_proof[0][1])
         print ("Result received (by first) -  ", result_proof[0][0])
         print ("Request id - ", request_id, "No of replies -  ", len(result_proof))
-        verify_result_proof(result_proof, request_id)
+        if verify_result_proof(result_proof, request_id) == False:
+            print("Retransmitting requestId - ", request_id, " and order - ", result_map[request_id][1])
+            retransmit_failed_opr(request_id, result_map[request_id][1])
         return
 
     def receive(msg=('retransmission_result', result_proof, replica_no, order_id)):
         """ Receiving the RESULT_PROOF for retransmitted request from replica.
         """
-
         print("Received Retransmission result - ", result_proof[0],
                 " from - ", replica_no, " for - ", order_id)
+        print(" and order - ", result_proof[1][0][1])
+        if verify_result_proof(result_proof[1], order_id) == False:
+            retransmit_failed_opr(order_id, result_map[order_id][1])
 
         '''logging.info("Received RESULT for retransmitted request." +
                      "From Replica {Name:%s, No:%s}, RESULT { %s }",
@@ -235,28 +241,27 @@ class client(process):
                              "RequestId: %s, Order: %s}", str(client_no),
                              str(request_id), str(order),
                              extra=logger.NODE_INFO)
-                retransmission_flag = True
-                while retransmission_flag:
-                    logging.info("Send CURRENT_CONFIG query to Olympus.",
-                                 extra=logger.NODE_INFO)
-                    #send(('req_curr_config', self), to=olympus)
-                    #await(some(received(('rcv_curr_config', _, _, _))))
-                    get_valid_configuration()
-                    for rep in current_replicas:
-                        print('sending retransmission to : ', str(rep))
-                        logging.info("RETRANSMIT_REQUEST to replica { %s }",
-                                     str(rep), extra=logger.NODE_INFO)
-                        send(('retransmission', self, client_no, request_id,
-                              order), to=rep)
-                        if await(len(setof(a,
-                                 received(('retransmission_result', _, _,_),
-                                          from_=a))) > 0):
-                            retransmission_flag = False
-                        elif timeout(int(time_out)/1000):
-                            logging.info("RETRANSMIT_REQUEST timed out. " +
-                                         "{RequestId: %s}", str(request_id),
-                                         extra=logger.NODE_INFO)
-                            continue
+                retransmit_failed_opr(request_id, order)
+
+    def retransmit_failed_opr(request_id, order):
+        retransmission_flag = True
+        while retransmission_flag:
+            logging.info("Send CURRENT_CONFIG query to Olympus.",
+                extra=logger.NODE_INFO)
+            get_valid_configuration()
+            for rep in current_replicas:
+                print('sending retransmission to : ', str(rep))
+                logging.info("RETRANSMIT_REQUEST to replica { %s }",
+                    str(rep), extra=logger.NODE_INFO)
+                send(('retransmission', self, client_no, request_id,
+                    order), to=rep)
+                if await(len(setof(a, received(('retransmission_result', _, _,_), from_=a))) > 0):
+                    retransmission_flag = False
+                elif timeout(int(time_out)/1000):
+                    logging.info("RETRANSMIT_REQUEST timed out. " +
+                        "{RequestId: %s}", str(request_id), extra=logger.NODE_INFO)
+                    continue
+
 
     def get_valid_configuration():
         send(('req_curr_config', self), to=olympus)
