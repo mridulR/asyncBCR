@@ -4,6 +4,7 @@
 import sys
 import os
 import logging
+import json
 from src.utils import logger
 import nacl.encoding
 import nacl.signing
@@ -13,7 +14,7 @@ import time
 # Configuration Params to be read from config file
 
 HOST = 'olympus_host'
-
+HASHER = nacl.hash.sha256
 current_milli_time = lambda: int(round(time.time() * 1000))
 
 class olympus(process):
@@ -46,6 +47,8 @@ class olympus(process):
         self.replica_info = {}
         self.config = 0
         self.consistent_caught_up = {}
+        self.reconfig_running_state = None
+        self.reconfig_hash_value = None
         return
 
     def is_checkpoint_consistent(replica_info):
@@ -122,7 +125,7 @@ class olympus(process):
                 await(len(setof(a, received(('wedge_resp', _, _,_,_,_), from_=a))) == quorum_size)
             else:
                 long_hist = build_longest_history(replica_info)
-                if is_caught_up_consistent(replica_info, long_hist):
+                if is_caught_up_consistent(replica_info, long_hist) and get_running_state() != None:
                     new_chk_point = chk_pt
                     new_chk_point.update(long_hist)
                     config += 1
@@ -143,9 +146,31 @@ class olympus(process):
         is_reconfig_in_progress = False
         return
 
+    def verify_running_state(running_state):
+        msg = 16 * str.encode(json.dumps(running_state))
+        digest = HASHER(msg, encoder=nacl.encoding.HexEncoder)
+        if digest == reconfig_hash_value:
+            reconfig_running_state = running_state
+            return True
+        else:
+            return False
+
+    def receive(msg=('rcv_running_state', replica_no, running_state)):
+        if verify_running_state(running_state):
+            print("Valid running state for ", replica_no)
+        else:
+            print("Invalid running state for ", replica_no)
+
+    def get_running_state():
+        for key in consistent_caught_up.keys():
+            send(('get_running_state',), to=replica_list[key])
+        await(len(setof(a, received(('rcv_running_state',_,_,), from_=a))) == quorum_size)
+        return reconfig_running_state
 
     def is_caught_up_consistent(replica_info, long_hist):
         consistent_caught_up = {}
+        reconfig_running_state = None
+        reconfig_hash_value = None
         for ind in replica_info.keys():
             replica = replica_list[ind]
             send(('catch_up', long_hist), to=replica)
@@ -158,6 +183,7 @@ class olympus(process):
                 hash_value = consistent_caught_up[key]
             elif hash_value != consistent_caught_up[key]:
                 return False
+        reconfig_hash_value = hash_value    
         return True
 
 

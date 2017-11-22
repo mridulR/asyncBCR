@@ -530,7 +530,7 @@ class replica(process):
 
         injected_slot = current_slot
         invalid_order_sign = False
-        invalid_result_sign = False
+        invalid_result_sign = None 
         injected_result = None
         injected_extra_op = None
         injected_drop_result_statement = None
@@ -771,7 +771,7 @@ class replica(process):
         completed_checkpoint_key = str(completed_checkpoint_counter)
         triggers = ["completed_checkpoint"]
         keys = [completed_checkpoint_key]
-
+        
         injected_extra_op = None
         injected_drop = None
         injected_drop_checkpt_stmnts = None
@@ -810,7 +810,6 @@ class replica(process):
                 print("slot - ", order_proofs[0], " order - ", order_proofs[1], \
                     " replica - ", order_proofs[2], "  sign - ", len(order_proofs[3]))
         print("checkpont return Success ***********************")
-
         if self.prev != None:
             send(('chk_point_rslt', chk_point_proof, chk_point_index,), to=prev)
 
@@ -853,6 +852,7 @@ class replica(process):
 
                     if injected_drop == None:
                       send(('chk_point_frwd', chk_point_proof, chk_point_index,), to=next_r)
+
                 else:
 
                     checkpoint_counter += 1
@@ -904,9 +904,10 @@ class replica(process):
                     print(checkpoint)
                     print(history)
                     print("checkpont return Success ***********************")'''
-
+                    
                     if injected_drop == None:
                         send(('chk_point_rslt', chk_point_proof, chk_point_index,), to=prev)
+
             else:
                 print("checkpointing failed verification, invoke reconfiguration")
 
@@ -933,7 +934,7 @@ class replica(process):
 
         self.state = "ACTIVE"
         print("sending new config ack to olympus")
- 
+        
         # Injection Code Start
         injected_extra_op = None
         injected_drop = None
@@ -957,7 +958,10 @@ class replica(process):
 
         if injected_drop == None:
             send(('new_config_done', replica_no), to=olympus)
-            self.cache = {}
+            self.cache = {} 
+
+        send(('new_config_done', replica_no), to=olympus)
+        self.cache = {}
 
         return 
 
@@ -972,23 +976,23 @@ class replica(process):
     def catch_longest_hist(slot_order_map, long_hist):
         for key in long_hist.keys():
             if key not in slot_order_map:
-                slot_order_map[key] = long_hist[key]
-        return slot_order_map
+                command_executor.get_result(long_hist[key], running_state)
+        return running_state
 
     def receive(msg=('catch_up', long_hist), from_=olympus):
         print("sending caught up to olympus")
         slot_order_map = build_slot_order_map(history)
-        catched_history = catch_longest_hist(slot_order_map, long_hist)
-        catched_hist_str = json.dumps(catched_history)
-        print("catched_hist_str ********* ", catched_hist_str)
-        msg = 16 * str.encode(catched_hist_str)
+        catched_running_state = catch_longest_hist(slot_order_map, long_hist)
+        catched_running_state_str = json.dumps(catched_running_state)
+        print("catched_running_state_str ********* ", catched_running_state_str)
+        msg = 16 * str.encode(catched_running_state_str)
         digest = HASHER(msg, encoder=nacl.encoding.HexEncoder)
-
+        
         catch_up_counter += 1
         catch_up_key = str(catch_up_counter)
         triggers = ["catch_up"]
         keys = [catch_up_key]
-
+    
         # Injection Code Start
         injected_extra_op = None
         injected_drop = None
@@ -1014,6 +1018,10 @@ class replica(process):
 
         return 
 
+    def receive(msg=('get_running_state',), from_=olympus):
+        print("Sending state to olympus")
+        send(('rcv_running_state',replica_no, running_state), to=olympus)
+
     def receive(msg=('activate',), from_=olympus):
         self.state = "ACTIVE"
         print("Setting state as active")
@@ -1028,7 +1036,7 @@ class replica(process):
         wedge_key = str(wedge_request_counter)
         triggers = ["wedge_request"]
         keys = [wedge_key]
-
+        
         # Injection Code Start
         injected_extra_op = None
         injected_drop = None
@@ -1050,7 +1058,7 @@ class replica(process):
             extra_op_ret = command_executor.get_result(injected_extra_op, running_state)
 
         if injected_drop == None:
-            send(('wedge_resp', replica_no, checkpoint_ind, checkpoint, history, client_last_op), to=olympus)
+            send(('wedge_resp', replica_no, checkpoint_ind, checkpoint, history, client_last_op), to=olympus) 
 
         return
 
@@ -1405,7 +1413,7 @@ class replica(process):
                     logging.info("Replica new history. { New Length: %s  }",
                                  len(history), extra=logger.NODE_INFO)
                     return True
-        return False
+        return False 
 
     def is_result_injected_rs_tail(trigger_type, arg_list ):
         if  "result_shuttle" in trigger_type:
@@ -1794,7 +1802,7 @@ class replica(process):
                     logging.info("Replica new history. { New Length: %s  }",
                                  len(history), extra=logger.NODE_INFO)
                     return True
-        return False
+        return False 
 
     # Only head is supposed to handle order request from client
     def receive(msg=('request_order', client, client_no, unique_order_ide,
@@ -1873,7 +1881,7 @@ class replica(process):
             keys = [shuttle_key]
 
             invalid_order_sign = False
-            invalid_result_sign = False
+            invalid_result_sign = None 
             injected_result = None
             injected_extra_op = None
             injected_drop_result_statement = None
@@ -1960,7 +1968,7 @@ class replica(process):
             client_shuttle_counter[client_no] += 1
 
             if client_no not in client_result_shuttle_counter:
-                client_result_shuttle_counter[client_no] = 0
+                    client_result_shuttle_counter[client_no] = 0
             client_result_shuttle_counter[client_no] += 1
             
             shuttle_key = str(client_no) + "_" + str(client_shuttle_counter[client_no])
@@ -1973,7 +1981,7 @@ class replica(process):
 
             # Injection Code Start
             invalid_order_sign = False
-            invalid_result_sign = False
+            invalid_result_sign = None 
             injected_result = None
             injected_extra_op = None
             injected_drop_result_statement = None
@@ -2022,9 +2030,8 @@ class replica(process):
                      order_inj = "get('X')"
 
                 result = command_executor.get_result(order_inj, running_state)
-
                 if injected_result != None:
-                    result = injected_result
+                     result = injected_result
 
                 # Injected code ------ End
                 predecessor_results = []
@@ -2049,6 +2056,7 @@ class replica(process):
                 if injected_drop == None:
                     send(('result_proof', result_proofs,
                           self.replica_no, unique_order_ide), to=client)
+
                 predecessor_order_proof = order_proofs[replica_no - 1][3]
                 order_proofs.append(combine_order_proof(current_slot,
                                     order_inj, predecessor_order_proof, invalid_order_sign))
@@ -2072,7 +2080,6 @@ class replica(process):
                         print("slot - ", order_proofs[0], " order - ", order_proofs[1], \
                             " replica - ", order_proofs[2], "  sign - ", len(order_proofs[3]))
                 print("checkpont return Success ***********************")
-                
                 if injected_drop == None:
                     send(('result_shuttle', unique_order_ide, client_no,
                           result_proofs,), to=self.prev)
@@ -2102,10 +2109,10 @@ class replica(process):
         keys = [result_key]
 
         print("Received forward shuttle - ", unique_order_ide)
-
+        
         # Injection Code Start
         invalid_order_sign = False
-        invalid_result_sign = False
+        invalid_result_sign = None 
         injected_result = None
         injected_extra_op = None
         injected_drop_result_statement = None
@@ -2155,7 +2162,7 @@ class replica(process):
             if injected_result != None:
                 result_proofs = result_proof_pair[1]
                 result_proof_pair = ("OK", result_proofs)
-
+            
             if injected_drop_result_statement != None: 
                 result_proofs = result_proof_pair[1][1:]
                 result_proof_pair = (result_proof_pair[0], result_proofs)
@@ -2174,7 +2181,7 @@ class replica(process):
                              result_proof_pair[0][0], extra=logger.NODE_INFO)
                 if is_valid_result_proof(result_proof_pair, result_with_proof[0]):
                     if injected_drop == None:
-                        send(('result_shuttle', unique_order_ide, client_no,
+                         send(('result_shuttle', unique_order_ide, client_no,
                               result_proof_pair,), to=self.prev)
                 else:
                     print("Raise reconfiguration as result proof has exception")
@@ -2188,7 +2195,7 @@ class replica(process):
                 for order_proofs in his:
                     print("slot - ", order_proofs[0], " order - ", order_proofs[1],\
                          " replica - ", order_proofs[2], "  sign - ", len(order_proofs[3]))
-            print("checkpont return Success ***********************")
+            print(" checkpont return Success ***********************")
         except KeyError:
             print("Due to new configuration, client is required to resend this order")
         return
