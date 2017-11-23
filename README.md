@@ -1,6 +1,6 @@
 # Byzantine chain replication (BCR)
 
-This is phase 2 implementation of Byzantine chain replication protocol for the
+This is phase 3 implementation of Byzantine chain replication protocol for the
 course project CSE 535.
 
 ## PLATFORM USED FOR DEVELOPMENT AND TESTING
@@ -73,7 +73,13 @@ Specifications are as follows:
       4.) Pattern matching was not very accurate. Did'nt test this thoroughly.
       5.) Result change at head from injection code fails. Client continously
           retransmits although it must not.
-      6.) Indirect message triggers are not handled
+      6.) When client sends different requests with same order id then the system will be reconfiguring
+          as replicas may think that the operation was changed on the midway.
+      7.) When multiple replicas send reconfiguration request at the same time. Multiple reconfiguration 
+          appears sometime due to race condition But they are eventually handled to stablize configuration.
+      8.) Forwarded_Request trigger does not support the new operations added for Phase 3.
+      9.) Replicas can save wrong result in the cache if the head does a change operation. Although, misbehaviour
+          will be detected and new configuration will be applied but wrong cached result will persist in checkpointing. 
 
 ### CONTRIBUTIONS:
     Mridul Ranjan - Worked mostly on Utils and Replicas.
@@ -81,12 +87,18 @@ Specifications are as follows:
                   - Result proofs validation at client.
                   - Supporting all dictionary operations.
                   - Coming up with testing scenarios
+                  - Implementation of reconfiguration logic
+                  - Retransmission handling for replicas on misbehaviour
+                  
 
     Rohit Kumar   - Worked on configuration of nodes with hashing.
                   - Worked on setting up messaging between clients and replicas
                   - Worked on timeouts, generating keys and fixing bugs.
                   - Worked on logging subsystem
-
+                  - Failure trigger injection 
+                  - Failure Trigger operations
+                  - Client validation for order proof
+                  
 ### MAIN FILES:
                   configuration_nodes -> /configure_nodes/configure_nodes.da
                   client -> src/client/client.da
@@ -103,18 +115,45 @@ git ls-files | grep -E ".da|.py" | xargs wc -l
 ========================================
   LOC|  FILENAME
 ========================================
-  164| configure_nodes/configure_nodes.da
-    0| src/__init__.py
-  267| src/client/client.da
-   66| src/olympus/olympus.da
-  735| src/replicas/replica.da
-    0| src/utils/__init__.py
-   62| src/utils/command_executor.py
-   23| src/utils/config_parser.py
-   40| src/utils/logger.py
+   164 configure_nodes/configure_nodes.da
+     0 src/__init__.py
+   310 src/client/client.da
+   241 src/olympus/olympus.da
+  2282 src/replicas/replica.da
+     0 src/utils/__init__.py
+    62 src/utils/command_executor.py
+    23 src/utils/config_parser.py
+    40 src/utils/logger.py
+  3122 total
+
 =========================================
- 1357| total
-        
+ 3122 | total
+
+PERFORMANCE EVALUATION:
+======================
+    RAFT:
+    =====
+    
+        [33111] raft.Node_<Node_:8a401>:OUTPUT: All clients done.
+        [33131] raft.Node_<Node_:8a401>:OUTPUT: elapsed time (seconds):  32.76565742492676
+        [33132] da.api<MainProcess>:INFO: Main process terminated.
+    
+    BCR:
+    ====
+    Client#0
+       Start Time  = 1511393499.3037
+       End Time    = 1511393608.8885
+       Total Time Elapsed = 109.584 secs
+    
+    Client#1
+       Start Time:  = 1511393501.306962
+       End Time     = 1511393608.543219
+       Total Time Elapsed = 107.236 secs
+    
+    Client#2
+       Start Time = 1511393503.311600
+       End Time   = 1511393608.403883
+       Total Time Elapsed = 105.092 secs
 
 ### LANGUAGE FEATURE USAGE
                   list comprehensions ---> ~45
