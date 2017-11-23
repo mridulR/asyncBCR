@@ -518,6 +518,7 @@ class replica(process):
                             print("Request of reconfiguration from head")
                             logging.info("Request of reconfiguration from head",
                                          extra=logger.NODE_INFO)
+                            send(('req_reconfiguration', replica_no), to=olympus)
                 else:
                     handle_client_req_at_head(client, client_no, order_id, order,
                                              None, None)
@@ -530,6 +531,7 @@ class replica(process):
                         print("Request of reconfiguration from head")
                         logging.info("Request of reconfiguration from head", \
                                                     extra=logger.NODE_INFO)
+                        send(('req_reconfiguration', replica_no), to=olympus)
         
             except KeyError:
                 print("Cache was reset during reconfig, hence client should retry")
@@ -617,7 +619,6 @@ class replica(process):
             history.append(order_proofs)
             if injected_drop == None:
                 head_time_out_counter[unique_order_ide] = current_milli_time()
-                print("Head current time - ", head_time_out_counter[unique_order_ide])
                 send(('forward_shuttle', client, client_no, unique_order_ide,
                       order_proofs, result_proof,), to=next_r)
 
@@ -957,6 +958,7 @@ class replica(process):
 
             else:
                 print("checkpointing failed verification, invoke reconfiguration")
+                send(('req_reconfiguration', replica_no), to=olympus)
 
     def receive(msg=('new_configuration', config_ind, chk_pt_ind, chk_pt, run_state), from_=olympus):
         print("Received new configuration ======, ", chk_pt)
@@ -2227,7 +2229,11 @@ class replica(process):
                 if injected_drop == None:
                     send(('forward_shuttle', client, client_no, unique_order_ide,
                          order_proofs, result_proofs,), to=self.next_r)
-            # else make reconfiguration call to olympus
+            
+            else:
+                print("Order proof invalid so reconfiguration")
+                send(('req_reconfiguration', replica_no), to=olympus)
+
         else:
 
             if client_no not in client_shuttle_counter:
@@ -2355,6 +2361,7 @@ class replica(process):
                           result_proofs,), to=self.prev)
             else:
                 print ("order proof verification failed  - ", unique_order_ide)
+                send(('req_reconfiguration', replica_no), to=olympus)
             return
                 #else:  No verification for result proof at tail
                 #    print("Result proof error so raise reconfiguration")
@@ -2455,6 +2462,7 @@ class replica(process):
                 print("Time taken by shuttle ", unique_order_ide, " - ", str(time_taken))
                 if time_taken > int(non_head_time_out):
                     print("Reconfiguration because of non_head timeout")
+                    send(('req_reconfiguration', replica_no), to=olympus)
 
 
                 logging.info("Sending REVERSE_SHUTTLE to previous replica in " +
@@ -2469,11 +2477,13 @@ class replica(process):
                     print("Raise reconfiguration as result proof has exception")
                     logging.info("Riase reconfiguration request due to result proof MISBEHAVIOUR", 
                                  extra=logger.NODE_INFO)
+                    send(('req_reconfiguration', replica_no), to=olympus)
             else:
                 time_taken = int(current_milli_time()) - int(head_time_out_counter[unique_order_ide])
                 print("Time taken by shuttle ", unique_order_ide, " - ", str(time_taken))
                 if time_taken > int(head_time_out):
                     print("Reconfiguration because of head timeout")
+                    send(('req_reconfiguration', replica_no), to=olympus)
 
             print("checkpont Completed ***********************")
             print(checkpoint_ind, " - ", client_last_op)
@@ -2564,6 +2574,7 @@ class replica(process):
                 print("Reconfiguration request raised by ", self)
                 logging.info("Reconfiguration request raised by self",
                              extra=logger.NODE_INFO)
+                send(('req_reconfiguration', replica_no), to=olympus)
 
     def run():
         print("Replica : ", str(self.me))
