@@ -158,6 +158,9 @@ class replica(process):
 
     def set_crash():
         state = "CRASH"
+        logging.info("Replica CRASHED !!!", extra=logger.NODE_INFO)
+        return 
+
 
     def init_triggers_counters():
 
@@ -478,6 +481,7 @@ class replica(process):
             reconfiguration to olympus. """
 
         if state == "CRASH":
+            logging.info("Replica CRASHED !!! ", extra=logger.NODE_INFO)
             return
 
         if self.prev == None:
@@ -492,32 +496,56 @@ class replica(process):
                          "......", extra=logger.NODE_INFO)
             try:
                 if order_id in cache and len(cache[order_id]) == 2:
+                    logging.info("Sending retransmission_result from cache to client." + 
+                                 "{ Replica: %s, OrderId: %s, Result: %s }",
+                                 str(replica_no), str(order_id), cache[order_id],
+                                 extra=logger.NODE_INFO)
                     send(('retransmission_result', cache[order_id], replica_no, order_id,),
                          to=client)
 
-                    logging.info("Sending retransmission_ack ACK: {orderId: %s}",
+                    logging.info("Sending retransmission_ack to replica. ACK: {orderId: %s}",
                                  str(order_id), extra=logger.NODE_INFO)
 
                     send(('retransmission_ack', order_id), to=replica)
 
                 elif order_id in cache and len(cache[order_id]) == 1:
                     if await(len(cache[order_id]) == 2):
+
+                        logging.info("Sending retransmission_result from cache to client." + 
+                                     "{ Replica: %s, OrderId: %s, Result: %s }",
+                                     str(replica_no), str(order_id), cache[order_id],
+                                     extra=logger.NODE_INFO)
+
                         send(('retransmission_result', cache[order_id],
                              replica_no, order_id,), to=client)
+
+                        logging.info("Sending retransmission_ack to replica. ACK: {orderId: %s}",
+                                 str(order_id), extra=logger.NODE_INFO)
                         send(('retransmission_ack', order_id), to=replica)
 
                     elif timeout(int(time_out) / 1000):
+
+                        logging.info("Replica Timed out !!!! ", extra=logger.NODE_INFO)
+
                         handle_client_req_at_head(client, client_no, order_id,
                                                   order, None, None)
                         if await(len(cache[order_id]) == 2):
+
+                            logging.info("Sending retransmission_result from cache to client." + 
+                                     "{ Replica: %s, OrderId: %s, Result: %s }",
+                                     str(replica_no), str(order_id), cache[order_id],
+                                     extra=logger.NODE_INFO)
+
                             send(('retransmission_result', cache[order_id],
                                   replica_no, order_id,), to=client)
+
+                            logging.info("Sending retransmission_ack to replica. ACK: {orderId: %s}",
+                                         str(order_id), extra=logger.NODE_INFO)
                             send(('retransmission_ack', order_id), to=replica)
 
                         elif timeout(int(time_out) / 1000):
                             print("Request of reconfiguration from head")
-                            logging.info("Request of reconfiguration from head",
-                                         extra=logger.NODE_INFO)
+                            logging.info("Request of reconfiguration from head to olympus", extra=logger.NODE_INFO)
                             send(('req_reconfiguration', replica_no), to=olympus)
                 else:
                     handle_client_req_at_head(client, client_no, order_id, order,
@@ -535,8 +563,11 @@ class replica(process):
         
             except KeyError:
                 print("Cache was reset during reconfig, hence client should retry")
+                logging.info("Cache reset during reconfig. Client must retry !!!", extra=logger.NODE_INFO)
+
         else:
             print("Only head has to eventually deal with re transmission request")
+            logging.info("Head will deal with retransmission request !!!", extra=logger.NODE_INFO)
 
     def handle_client_req_at_head(client, client_no, unique_order_ide,
                                   order_req, triggers, keys):
@@ -691,6 +722,9 @@ class replica(process):
             chk_point_proof[replica_no] = extract_slot_order_map_from_history(history)
             print("checkpointing started *********************** ", len(chk_point_proof))
 
+            logging.info("Starting Checkpoint !!! { Checkpoint Index: %s }",
+                         str(checkpoint_ind), extra=logger.NODE_INFO)
+           
             checkpoint_counter += 1
             checkpoint_key = str(checkpoint_counter)
             triggers = ["checkpoint"]
@@ -720,6 +754,8 @@ class replica(process):
                 extra_op_ret = command_executor.get_result(injected_extra_op, running_state)
 
             if injected_drop == None:
+                logging.info("Sending Checkpoint Forward Message !!! { Checkpoint Index: %s }",
+                             str(checkpoint_ind), extra=logger.NODE_INFO)
                 send(('chk_point_frwd', chk_point_proof, checkpoint_ind + 1,), to=next_r)
 
             return
@@ -795,6 +831,9 @@ class replica(process):
         rslt_chk_pt = get_Min_Check_Pt_Map(chk_point_proof)
         rslt_history = get_result_history(rslt_chk_pt, history)
 
+        logging.info("Received Checkpoint Result Message !!! { Checkpoint Index: %s }",
+                     str(chk_point_index), extra=logger.NODE_INFO)
+
         ## update values
         checkpoint_ind = chk_point_index
         checkpoint.update(rslt_chk_pt)
@@ -847,13 +886,19 @@ class replica(process):
                 print("slot - ", order_proofs[0], " order - ", order_proofs[1], \
                     " replica - ", order_proofs[2], "  sign - ", len(order_proofs[3]))
         print("checkpont return Success ***********************")
+
+        logging.info("Checkpoint Successfully Completed !!! ", extra=logger.NODE_INFO)
+
         if self.prev != None:
+            logging.info("Sending checkpoint result to previous replica !!! ", extra=logger.NODE_INFO)
             send(('chk_point_rslt', chk_point_proof, chk_point_index,), to=prev)
+        return
 
 
     def receive(msg=('chk_point_frwd', chk_point_proof, chk_point_index,), from_=self.prev):
 
         if state == "CRASH":
+            logging.info("Replica CRASHED !!! ", extra=logger.NODE_INFO)
             return
 
 
@@ -896,6 +941,7 @@ class replica(process):
                         extra_op_ret = command_executor.get_result(injected_extra_op, running_state)
 
                     if injected_drop == None:
+                      logging.info("Sending checkpoint forward to next replica !!! ", extra=logger.NODE_INFO)
                       send(('chk_point_frwd', chk_point_proof, chk_point_index,), to=next_r)
 
                 else:
@@ -954,10 +1000,12 @@ class replica(process):
                     print("checkpont return Success ***********************")'''
                     
                     if injected_drop == None:
+                        logging.info("Sending checkpoint result to prev replica !!! ", extra=logger.NODE_INFO)
                         send(('chk_point_rslt', chk_point_proof, chk_point_index,), to=prev)
 
             else:
                 print("checkpointing failed verification, invoke reconfiguration")
+                logging.info("Sending req-reconfiguration to Olympus !!! ", extra=logger.NODE_INFO)
                 send(('req_reconfiguration', replica_no), to=olympus)
 
     def receive(msg=('new_configuration', config_ind, chk_pt_ind, chk_pt, run_state), from_=olympus):
@@ -970,6 +1018,9 @@ class replica(process):
         self.client_last_op = {}
         self.current_slot = 0
         self.running_state = {}
+
+        logging.info("Received new_configuration request !!! ", extra=logger.NODE_INFO)
+
         #self.cache = {}
 
         #for slot in sorted(checkpoint.keys()):
@@ -1012,9 +1063,11 @@ class replica(process):
             extra_op_ret = command_executor.get_result(injected_extra_op, running_state)
 
         if injected_drop == None:
+            logging.info("Sending new_config_done request !!! ", extra=logger.NODE_INFO)
             send(('new_config_done', replica_no), to=olympus)
             self.cache = {} 
 
+        logging.info("Sending new_config_done to Olympus !!! ", extra=logger.NODE_INFO)
         send(('new_config_done', replica_no), to=olympus)
         self.cache = {}
 
@@ -1076,6 +1129,7 @@ class replica(process):
             extra_op_ret = command_executor.get_result(injected_extra_op, running_state)
 
         if injected_drop == None:
+            logging.info("Sending Caught_up to Olympus !!! ", extra=logger.NODE_INFO)
             send(('caught_up', replica_no, digest), to=olympus)
 
         return 
@@ -1113,6 +1167,7 @@ class replica(process):
             extra_op_ret = command_executor.get_result(injected_extra_op, running_state)
 
         if injected_drop == None:
+            logging.info("Sending running state to Olympus !!! ", extra=logger.NODE_INFO)
             send(('rcv_running_state',replica_no, running_state), to=olympus)
 
         return
@@ -1126,6 +1181,7 @@ class replica(process):
     def receive(msg=('wedge',), from_=olympus):
 
         if state == "CRASH":
+            logging.info("Replica CRASH !!! ", extra=logger.NODE_INFO)
             return
 
         print("wedge statement received from olympus")
@@ -1160,6 +1216,7 @@ class replica(process):
             extra_op_ret = command_executor.get_result(injected_extra_op, running_state)
 
         if injected_drop == None:
+            logging.info("Sending WEDGE Response to Olympus. !!! ", extra=logger.NODE_INFO)
             send(('wedge_resp', replica_no, checkpoint_ind, checkpoint, history, client_last_op), to=olympus) 
 
         return
@@ -2232,6 +2289,7 @@ class replica(process):
             
             else:
                 print("Order proof invalid so reconfiguration")
+                logging.info("Sending REQUEST RECONFIGURATION to Olympus !!! ", extra=logger.NODE_INFO)
                 send(('req_reconfiguration', replica_no), to=olympus)
 
         else:
@@ -2361,6 +2419,9 @@ class replica(process):
                           result_proofs,), to=self.prev)
             else:
                 print ("order proof verification failed  - ", unique_order_ide)
+                logging.info("Order proof verification Failed { OrderId: %s} !!! ", 
+                             str(unique_order_ide),extra=logger.NODE_INFO)
+                logging.info("Sending REQUEST RECONFIGURATION to Olympus !!! ", extra=logger.NODE_INFO)
                 send(('req_reconfiguration', replica_no), to=olympus)
             return
                 #else:  No verification for result proof at tail
@@ -2462,6 +2523,8 @@ class replica(process):
                 print("Time taken by shuttle ", unique_order_ide, " - ", str(time_taken))
                 if time_taken > int(non_head_time_out):
                     print("Reconfiguration because of non_head timeout")
+                    logging.info("Sending REQUEST RECONFIGURATION to Olympus because of non_head timeout !!! ",
+                                 extra=logger.NODE_INFO)
                     send(('req_reconfiguration', replica_no), to=olympus)
 
 
@@ -2483,6 +2546,8 @@ class replica(process):
                 print("Time taken by shuttle ", unique_order_ide, " - ", str(time_taken))
                 if time_taken > int(head_time_out):
                     print("Reconfiguration because of head timeout")
+                    logging.info("Riase reconfiguration request due to head timeout ", 
+                                 extra=logger.NODE_INFO)
                     send(('req_reconfiguration', replica_no), to=olympus)
 
             print("checkpont Completed ***********************")
@@ -2494,6 +2559,7 @@ class replica(process):
                     print("slot - ", order_proofs[0], " order - ", order_proofs[1],\
                          " replica - ", order_proofs[2], "  sign - ", len(order_proofs[3]))
             print(" checkpont return Success ***********************")
+            logging.info("Checkpoint Success !!! ", extra=logger.NODE_INFO)
         except KeyError:
             print("Due to new configuration, client is required to resend this order")
         return
@@ -2549,11 +2615,15 @@ class replica(process):
             if order_req == cache[order_id]:
                 print("sending retransmission respose from cache for - ", order_id)
 
+                logging.info("Sending retransmission response from cache. { OrderId: %s} !!! ", 
+                             str(order_id), extra=logger.NODE_INFO)
                 send(('retransmission_result', result_proof_pair, replica_no, order_id,),
                  to=client)
             else:
                 print("***************************************************")
                 print("This order was changed, hence reconfiguration")
+                logging.info("Request Reconfiguration as order was changed. { OrderId: %s} !!! ", 
+                             str(order_id), extra=logger.NODE_INFO)
                 send(('req_reconfiguration', replica_no), to=olympus)
         else:
             logging.info("Retransmission request send to HEAD. {OrderNo: %s" +
