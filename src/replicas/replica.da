@@ -45,6 +45,7 @@ class replica(process):
         self.opr_count_chk_pt = 0
         self.checkpoint_ind = 0
         self.checkpoint = {}
+        self.longest_hist = {}
 
         # Testing
         self.global_operation = ""
@@ -425,11 +426,6 @@ class replica(process):
             return False
         slot = order_proofs[0][0]
         order = order_proofs[0][1]
-        if slot in cache:
-            logging.error("MISBEHAVIOUR: Conflicting slot. Slot already " +
-                          "present in cache. {SlotNo: %s}", slot,
-                          extra=logger.NODE_INFO)
-            return False
         for ind in range(0, replica_no):
             order_proof = order_proofs[ind]
             pred_slot = order_proof[0]
@@ -546,7 +542,9 @@ class replica(process):
                         elif timeout(int(time_out) / 1000):
                             print("Request of reconfiguration from head")
                             logging.info("Request of reconfiguration from head to olympus", extra=logger.NODE_INFO)
-                            send(('req_reconfiguration', replica_no), to=olympus)
+                            if state == "ACTIVE":
+                                state = "IMMUTABLE"
+                                send(('req_reconfiguration', replica_no), to=olympus)
                 else:
                     handle_client_req_at_head(client, client_no, order_id, order,
                                              None, None)
@@ -559,7 +557,9 @@ class replica(process):
                         print("Request of reconfiguration from head")
                         logging.info("Request of reconfiguration from head", \
                                                     extra=logger.NODE_INFO)
-                        send(('req_reconfiguration', replica_no), to=olympus)
+                        if state == "ACTIVE":
+                            state = "IMMUTABLE"
+                            send(('req_reconfiguration', replica_no), to=olympus)
         
             except KeyError:
                 print("Cache was reset during reconfig, hence client should retry")
@@ -1006,17 +1006,20 @@ class replica(process):
             else:
                 print("checkpointing failed verification, invoke reconfiguration")
                 logging.info("Sending req-reconfiguration to Olympus !!! ", extra=logger.NODE_INFO)
-                send(('req_reconfiguration', replica_no), to=olympus)
+                if state == "ACTIVE":
+                    state = "IMMUTABLE"
+                    send(('req_reconfiguration', replica_no), to=olympus)
 
-    def receive(msg=('new_configuration', config_ind, chk_pt_ind, chk_pt, run_state), from_=olympus):
-        print("Received new configuration ======, ", chk_pt)
+    def receive(msg=('new_configuration', config_ind, run_state), from_=olympus):
+        print("Received new configuration ======, " )
         self.configuration_num = config_ind
         self.history = []
-        self.opr_count_chk_pt = 0
-        self.checkpoint_ind = chk_pt_ind
-        self.checkpoint = chk_pt
+        #self.opr_count_chk_pt = 0
+        #self.checkpoint_ind = chk_pt_ind
+        self.checkpoint.update(longest_hist)
+        self.longest_hist = {}
         self.client_last_op = {}
-        self.current_slot = 0
+        #self.current_slot = self.current_slot + 1
         self.running_state = {}
 
         logging.info("Received new_configuration request !!! ", extra=logger.NODE_INFO)
@@ -1028,14 +1031,14 @@ class replica(process):
         #    current_slot = slot
         
         running_state = run_state
-        current_slot = sorted(checkpoint.keys())[-1]
+        #current_slot = sorted(checkpoint.keys())[-1]
 
         init_triggers_counters()
         set_failure_triggers()
         print("Resetting triggers")
         
 
-        self.state = "ACTIVE"
+        #self.state = "ACTIVE"
         print("sending new config ack to olympus")
         
         # Injection Code Start
@@ -1092,6 +1095,7 @@ class replica(process):
         if state == "CRASH":
             return
 
+        self.longest_hist = long_hist
         print("sending caught up to olympus")
         slot_order_map = build_slot_order_map(history)
         catched_running_state = catch_longest_hist(slot_order_map, long_hist)
@@ -1217,9 +1221,18 @@ class replica(process):
 
         if injected_drop == None:
             logging.info("Sending WEDGE Response to Olympus. !!! ", extra=logger.NODE_INFO)
-            send(('wedge_resp', replica_no, checkpoint_ind, checkpoint, history, client_last_op), to=olympus) 
+            slot_oper = build_map_from_history(history)
+            send(('wedge_resp', replica_no,  slot_oper), to=olympus) 
 
         return
+
+    def build_map_from_history(hist):
+        result = {}
+        for order_proofs in hist:
+            slot_no = order_proofs[0][0]
+            operation = order_proofs[0][1]
+            result[slot_no] = operation
+        return result
 
     def is_order_injected(trigger_type, arg_list ):
         if "shuttle" in trigger_type or "client_request" in trigger_type:
@@ -2140,7 +2153,7 @@ class replica(process):
                          extra=logger.NODE_INFO)
 
             self.opr_count_chk_pt = self.opr_count_chk_pt + 1
-            if self.opr_count_chk_pt % 3 == 0:
+            if self.opr_count_chk_pt % 10 == 0:
                 self.checkpoint_counter = self.checkpoint_counter + 1
                 #print("checkpointing counter - ", opr_count_chk_pt)
                 start_check_pointing()
@@ -2243,7 +2256,6 @@ class replica(process):
                 extra_op_ret = command_executor.get_result(injected_extra_op, running_state)
 
             # Injected code ----------- End
-
             if is_valid_order_proofs(order_proofs):
                 rcv_current_slot, order_req = get_slot_order(order_proofs)
 
@@ -2290,7 +2302,9 @@ class replica(process):
             else:
                 print("Order proof invalid so reconfiguration")
                 logging.info("Sending REQUEST RECONFIGURATION to Olympus !!! ", extra=logger.NODE_INFO)
-                send(('req_reconfiguration', replica_no), to=olympus)
+                if state == "ACTIVE":
+                    state = "IMMUTABLE"
+                    send(('req_reconfiguration', replica_no), to=olympus)
 
         else:
 
@@ -2351,8 +2365,6 @@ class replica(process):
                 extra_op_ret = command_executor.get_result(injected_extra_op, running_state)
 
             # Injected code ----------- End
-            
-
             if is_valid_order_proofs(order_proofs):
                 current_slot, order_req = get_slot_order(order_proofs)
 
@@ -2422,7 +2434,9 @@ class replica(process):
                 logging.info("Order proof verification Failed { OrderId: %s} !!! ", 
                              str(unique_order_ide),extra=logger.NODE_INFO)
                 logging.info("Sending REQUEST RECONFIGURATION to Olympus !!! ", extra=logger.NODE_INFO)
-                send(('req_reconfiguration', replica_no), to=olympus)
+                if state == "ACTIVE":
+                    state = "IMMUTABLE"
+                    send(('req_reconfiguration', replica_no), to=olympus)
             return
                 #else:  No verification for result proof at tail
                 #    print("Result proof error so raise reconfiguration")
@@ -2525,7 +2539,9 @@ class replica(process):
                     print("Reconfiguration because of non_head timeout")
                     logging.info("Sending REQUEST RECONFIGURATION to Olympus because of non_head timeout !!! ",
                                  extra=logger.NODE_INFO)
-                    send(('req_reconfiguration', replica_no), to=olympus)
+                    if state == "ACTIVE":
+                        state = "IMMUTABLE"
+                        send(('req_reconfiguration', replica_no), to=olympus)
 
 
                 logging.info("Sending REVERSE_SHUTTLE to previous replica in " +
@@ -2540,7 +2556,9 @@ class replica(process):
                     print("Raise reconfiguration as result proof has exception")
                     logging.info("Riase reconfiguration request due to result proof MISBEHAVIOUR", 
                                  extra=logger.NODE_INFO)
-                    send(('req_reconfiguration', replica_no), to=olympus)
+                    if state == "ACTIVE":
+                        state = "IMMUTABLE"
+                        send(('req_reconfiguration', replica_no), to=olympus)
             else:
                 time_taken = int(current_milli_time()) - int(head_time_out_counter[unique_order_ide])
                 print("Time taken by shuttle ", unique_order_ide, " - ", str(time_taken))
@@ -2548,7 +2566,9 @@ class replica(process):
                     print("Reconfiguration because of head timeout")
                     logging.info("Riase reconfiguration request due to head timeout ", 
                                  extra=logger.NODE_INFO)
-                    send(('req_reconfiguration', replica_no), to=olympus)
+                    if state == "ACTIVE":
+                        state = "IMMUTABLE"
+                        send(('req_reconfiguration', replica_no), to=olympus)
 
             print("checkpont Completed ***********************")
             print(checkpoint_ind, " - ", client_last_op)
@@ -2624,7 +2644,9 @@ class replica(process):
                 print("This order was changed, hence reconfiguration")
                 logging.info("Request Reconfiguration as order was changed. { OrderId: %s} !!! ", 
                              str(order_id), extra=logger.NODE_INFO)
-                send(('req_reconfiguration', replica_no), to=olympus)
+                #if state == "ACTIVE":
+                #    state = "IMMUTABLE"
+                #    send(('req_reconfiguration', replica_no), to=olympus)
         else:
             logging.info("Retransmission request send to HEAD. {OrderNo: %s" +
                          "OrderRequest: %s ClientNo: %s ClientId: %s}",
@@ -2644,7 +2666,9 @@ class replica(process):
                 print("Reconfiguration request raised by ", self)
                 logging.info("Reconfiguration request raised by self",
                              extra=logger.NODE_INFO)
-                send(('req_reconfiguration', replica_no), to=olympus)
+                if state == "ACTIVE":
+                    state = "IMMUTABLE"
+                    send(('req_reconfiguration', replica_no), to=olympus)
 
     def run():
         print("Replica : ", str(self.me))

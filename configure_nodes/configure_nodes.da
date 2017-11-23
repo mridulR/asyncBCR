@@ -44,7 +44,7 @@ def main():
                      ":/config/single_client_with_no_failure_with_workload." +
                      "csv", extra=logger.NODE_INFO)
 
-    config(channel="reliable")
+    config(channel="fifo")
     config_values = config_parser.get_config(config_file)
     hosts = [each_host.strip() for each_host in
              config_values[config_parser.HOSTS].split(';')]

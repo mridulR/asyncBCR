@@ -77,23 +77,27 @@ class olympus(process):
                         return False
         return True
 
-    def build_longest_history(replica_info):
-        if len(replica_info) < 2:
-            return None
-        longest_hist = {}
-        for key in replica_info.keys():
-            hist = replica_info[key][2]
-            for order_proofs in hist:
-                slot_no = order_proofs[0][0]
-                operation = order_proofs[0][1]
-                if slot_no in longest_hist.keys():
-                    prev_oper = longest_hist[slot_no]
-                    if prev_oper != operation:
-                        return None
-                else:
-                    longest_hist[slot_no] = operation
+    def get_slot_order_uninon(slot_order_map_1, slot_order_map_2):
+        result = {}
+        for key in slot_order_map_1.keys():
+            result[key] = slot_order_map_1[key]
+        
+        for key in slot_order_map_2.keys():
+            result[key] = slot_order_map_2[key]
+        return result
 
-        return longest_hist
+    def build_longest_history(chk_point_proof):
+        if chk_point_proof == None:
+            return None
+        if len(chk_point_proof) < 2:
+            return chk_point_proof
+
+        result = {}
+
+        result = chk_point_proof[0]
+        for ind in range(1, len(replicas)):
+            result = get_slot_order_union(result, chk_point_proof[ind])
+        return result
 
 
     def is_history_consistent(replica_info):
@@ -104,18 +108,18 @@ class olympus(process):
 
 
     def has_consistent_history_chk_pt(replica_info):
-        if not is_checkpoint_consistent(replica_info):
-            return False
+        #if not is_checkpoint_consistent(replica_info):
+        #    return False
         if not is_history_consistent(replica_info):
             return False
         return True
 
-    def receive(msg=('wedge_resp', replica_no, chk_pt_ind, chk_pt, hist, client_ord)):
+    def receive(msg=('wedge_resp', replica_no, hist)):
         print("Reconfiguration  response received from ", replica_no)
         if len(replica_info) == 0:
             config += 1
 
-        replica_info[replica_no] = (chk_pt_ind, chk_pt, hist, client_ord)
+        replica_info[replica_no] = hist
 
         if len(replica_info) == quorum_size:
             print("quorum replica - ", replica_info.keys())
@@ -123,36 +127,35 @@ class olympus(process):
                 is_reconfig_in_progress = False
                 for replica in replica_list:
                     send(('wedge',), to=replica)
-                await(len(setof(a, received(('wedge_resp', _, _,_,_,_), from_=a))) >= quorum_size)
+                await(len(setof(a, received(('wedge_resp', _,_), from_=a))) >= quorum_size)
             else:
                 long_hist = build_longest_history(replica_info)
                 if is_caught_up_consistent(replica_info, long_hist) and get_running_state() != None:
-                    new_chk_point = chk_pt
-                    new_chk_point.update(long_hist)
+                    #new_chk_point = chk_pt
+                    #new_chk_point.update(long_hist)
                     running_state = get_running_state()
                     config += 1
                     for replica in replica_list:
-                        send(('new_configuration', config, chk_pt_ind + 1, \
-                                new_chk_point, running_state,), to=replica)
+                        send(('new_configuration', config,  running_state,), to=replica)
                     print("Awaiting new configuration accepted")    
                     length = ( 2 * quorum_size ) + 1
                     replica_info = {}
                     if await(len(setof(a, received(('new_config_done',_,), from_=a))) == length):
                         replica_info = {}
-                        is_reconfig_in_progress = False
+                        #is_reconfig_in_progress = False
                     elif timeout(OLYMPUS_TIME_OUT_SEC):
                         is_reconfig_in_progress = False
                         for replica in replica_list:
                             send(('wedge',), to=replica)
-                        await(len(setof(a, received(('wedge_resp', _, _,_,_,_), from_=a))) >= quorum_size)
+                        await(len(setof(a, received(('wedge_resp', _,_), from_=a))) >= quorum_size)
 
                 else:
                     is_reconfig_in_progress = False
                     for replica in replica_list:
                         send(('wedge',), to=replica)
-                    await(len(setof(a, received(('wedge_resp', _, _,_,_,_), from_=a))) >= quorum_size)
+                    await(len(setof(a, received(('wedge_resp', _, __), from_=a))) >= quorum_size)
 
-        is_reconfig_in_progress = False
+        #is_reconfig_in_progress = False
         return
 
     def verify_running_state(running_state):
@@ -212,11 +215,13 @@ class olympus(process):
         print("Reconfiguration  request received from ", replica_no)
         for replica in replica_list:
             send(('wedge',), to=replica)
-        await(len(setof(a, received(('wedge_resp', _, _,_,_,_), from_=a))) >= quorum_size)
+
+        await(len(setof(a, received(('wedge_resp', _,_), from_=a))) >= quorum_size)
         for replica in replica_list:
             send(('activate',), to=replica)
         print("Awaiting activation ack")
         await(len(setof(a, received(('ack_activate', _), from_=a))) == len(replica_list))
+        is_reconfig_in_progress = False
         return
 
     def receive(msg=('ack_activate', replica_no)):

@@ -77,7 +77,7 @@ class client(process):
         if len(result_proofs) < 1:
             return False
         qualifier_result = result_proofs[0][0]
-        qualifier_order = result_proofs[0][1]
+        #qualifier_order = result_proofs[0][1]
 
         try:
             verify_key = replica_verify_keys[0]
@@ -109,13 +109,15 @@ class client(process):
                     print("Due to reconfiguration, this order is failed")
                     return False
 
-                if result_map[request_id][0] == result_value and qualifier_order == result_order:
+                if result_map[request_id][0] == result_value:
+                #if qualifier_order == result_order:
+                #if result_map[request_id][0] == result_value and qualifier_order == result_order:
                     qualifier_count = qualifier_count + 1
                 else:
                     if qualifier_count != 0:
                         qualifier_count = qualifier_count - 1
                     else:
-                        qualifier_order = result_order
+                        #qualifier_order = result_order
                         qualifier_result = result_value
                         qualifier_count = 1
             except IndexError:
@@ -125,7 +127,8 @@ class client(process):
         for rslt_proof in result_proofs:
             result_value = rslt_proof[0]
             result_order = rslt_proof[1]
-            if qualifier_result == result_map[request_id][0] and qualifier_order == result_order:
+            #if qualifier_result == result_map[request_id][0] and qualifier_order == result_order:
+            if qualifier_result == result_map[request_id][0]:
                 qualifier_count = qualifier_count + 1
 
         if qualifier_count > len(current_replicas) / 2 :
