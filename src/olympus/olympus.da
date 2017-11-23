@@ -16,6 +16,7 @@ import time
 HOST = 'olympus_host'
 HASHER = nacl.hash.sha256
 current_milli_time = lambda: int(round(time.time() * 1000))
+OLYMPUS_TIME_OUT_SEC = 3
 
 class olympus(process):
     """ An implementation to handle the singleton Olympus. """
@@ -122,7 +123,7 @@ class olympus(process):
                 is_reconfig_in_progress = False
                 for replica in replica_list:
                     send(('wedge',), to=replica)
-                await(len(setof(a, received(('wedge_resp', _, _,_,_,_), from_=a))) == quorum_size)
+                await(len(setof(a, received(('wedge_resp', _, _,_,_,_), from_=a))) >= quorum_size)
             else:
                 long_hist = build_longest_history(replica_info)
                 if is_caught_up_consistent(replica_info, long_hist) and get_running_state() != None:
@@ -136,14 +137,20 @@ class olympus(process):
                     print("Awaiting new configuration accepted")    
                     length = ( 2 * quorum_size ) + 1
                     replica_info = {}
-                    await(len(setof(a, received(('new_config_done',_,), from_=a))) == length)
-                    replica_info = {}
-                    is_reconfig_in_progress = False
+                    if await(len(setof(a, received(('new_config_done',_,), from_=a))) == length):
+                        replica_info = {}
+                        is_reconfig_in_progress = False
+                    elif timeout(OLYMPUS_TIME_OUT_SEC):
+                        is_reconfig_in_progress = False
+                        for replica in replica_list:
+                            send(('wedge',), to=replica)
+                        await(len(setof(a, received(('wedge_resp', _, _,_,_,_), from_=a))) >= quorum_size)
+
                 else:
                     is_reconfig_in_progress = False
                     for replica in replica_list:
                         send(('wedge',), to=replica)
-                    await(len(setof(a, received(('wedge_resp', _, _,_,_,_), from_=a))) == quorum_size)
+                    await(len(setof(a, received(('wedge_resp', _, _,_,_,_), from_=a))) >= quorum_size)
 
         is_reconfig_in_progress = False
         return
@@ -177,16 +184,18 @@ class olympus(process):
             replica = replica_list[ind]
             send(('catch_up', long_hist), to=replica)
         print("Awaitaing for caught up response from ", replica_info.keys())
-        await(len(setof(a, received(('caught_up', _, _), from_=a))) == quorum_size)
-        print("Await ended")
-        hash_value = ""
-        for key in consistent_caught_up.keys():
-            if len(hash_value) == 0:
-                hash_value = consistent_caught_up[key]
-            elif hash_value != consistent_caught_up[key]:
-                return False
-        reconfig_hash_value = hash_value    
-        return True
+        if await(len(setof(a, received(('caught_up', _, _), from_=a))) == quorum_size):
+            print("Await ended")
+            hash_value = ""
+            for key in consistent_caught_up.keys():
+                if len(hash_value) == 0:
+                    hash_value = consistent_caught_up[key]
+                elif hash_value != consistent_caught_up[key]:
+                    return False
+            reconfig_hash_value = hash_value
+            return True
+        elif timeout(OLYMPUS_TIME_OUT_SEC):
+            return False 
 
 
     def receive(msg=('new_config_done', client_no)):
