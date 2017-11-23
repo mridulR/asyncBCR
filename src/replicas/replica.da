@@ -882,7 +882,7 @@ class replica(process):
                         if is_sleep_injected_checkpoint(triggers, keys):
                             print("Sleep injected")
 
-                        if is_crash_injected_rslt_completed_checkpoint(triggers, keys):
+                        if is_crash_injected_checkpoint(triggers, keys):
                             print("Crash injected")
 
                         if is_drop_injected_checkpoint(triggers, keys ):
@@ -921,7 +921,7 @@ class replica(process):
                         if is_sleep_injected_completed_checkpoint(triggers, keys):
                             print("Sleep injected")
 
-                        if is_crash_injected_rslt_completed_checkpoint(triggers, keys):
+                        if is_crash_injected_completed_checkpoint(triggers, keys):
                             print("Crash injected")
 
                         if is_drop_injected_completed_checkpoint(triggers, keys ):
@@ -997,7 +997,7 @@ class replica(process):
             if is_sleep_injected_new_configuration():
                 print("Sleep injected")
 
-            if is_crash_injected_rslt_completed_checkpoint():
+            if is_crash_injected_new_configuration():
                 print("Crash injected")
 
             if is_drop_injected_new_configuration():
@@ -1061,7 +1061,7 @@ class replica(process):
             if is_sleep_injected_catch_up(triggers, keys):
                 print("Sleep injected")
 
-            if is_crash_injected_rslt_completed_checkpoint(triggers, keys):
+            if is_crash_injected_catch_up(triggers, keys):
                 print("Sleep injected")
 
             if is_drop_injected_catch_up(triggers, keys ):
@@ -1081,7 +1081,39 @@ class replica(process):
     def receive(msg=('get_running_state',), from_=olympus):
 
         print("Sending state to olympus")
-        send(('rcv_running_state',replica_no, running_state), to=olympus)
+
+        get_running_state_counter += 1
+        get_running_state_key = str(get_running_state_counter)
+        triggers = ["get_running_state"]
+        keys = [get_running_state_key]
+        
+        # Injection Code Start
+        injected_extra_op = None
+        injected_drop = None
+
+        if triggers != None:
+            if is_extra_op_injected_grs(triggers, keys ):
+                injected_extra_op = "put('a','a')"
+
+            if is_sleep_injected_grs(triggers, keys):
+                print("Sleep injected")
+
+            if is_crash_injected_grs(triggers, keys):
+                print("Crash injected")
+
+            if is_drop_injected_grs(triggers, keys ):
+                injected_drop = True
+
+            if is_history_truncated_injected_grs(triggers, keys ):
+                print("Truncated History")
+
+        if injected_extra_op != None:
+            extra_op_ret = command_executor.get_result(injected_extra_op, running_state)
+
+        if injected_drop == None:
+            send(('rcv_running_state',replica_no, running_state), to=olympus)
+
+        return
 
     def receive(msg=('activate',), from_=olympus):
         self.state = "ACTIVE"
@@ -1113,7 +1145,7 @@ class replica(process):
             if is_sleep_injected_wedge(triggers, keys):
                 print("Sleep injected")
 
-            if is_crash_injected_rslt_completed_checkpoint(triggers, keys):
+            if is_crash_injected_wedge(triggers, keys):
                 print("Crash injected")
 
             if is_drop_injected_wedge(triggers, keys ):
@@ -1599,6 +1631,61 @@ class replica(process):
                     return True
         return False
 
+    def is_extra_op_injected_grs(trigger_type, arg_list ):
+        if "wedge_request" in trigger_type:
+            if arg_list[0] in wedge_request_trigger:
+                if wedge_request_trigger[arg_list[0]].startswith("extra_op"):
+                    return True
+        return False
+
+    def is_crash_injected_grs(trigger_type, arg_list ):
+        if "wedge_request" in trigger_type:
+            if arg_list[0] in wedge_request_trigger:
+                if wedge_request_trigger[arg_list[0]].startswith("crash"):
+                    set_crash()
+                    return True
+        return False
+
+
+    def is_sleep_injected_grs(trigger_type, arg_list ):
+        if "wedge_request" in trigger_type:
+            if arg_list[0] in wedge_request_trigger:
+                if wedge_request_trigger[arg_list[0]].startswith("sleep"):
+                    func = generic_operation_parser(wedge_request_trigger[arg_list[0]])
+                    interval = func["args"][0]
+                    logging.info("Replica sleep will be triggered.", extra=logger.NODE_INFO)
+                    time.sleep(int(interval))
+                    logging.info("Replica sleep completed.", extra=logger.NODE_INFO)
+                    return True
+        return False
+
+    def is_drop_injected_grs(trigger_type, arg_list ):
+        if "wedge_request" in trigger_type:
+            if arg_list[0] in wedge_request_trigger:
+                if wedge_request_trigger[arg_list[0]].startswith("drop()"):
+                    return True
+        return False
+
+    def is_history_truncated_injected_grs(trigger_type, arg_list ):
+        if "wedge_request" in trigger_type:
+            if arg_list[0] in wedge_request_trigger:
+                if wedge_request_trigger[arg_list[0]].startswith("truncate_history"):
+                    func = generic_operation_parser(wedge_request_trigger[arg_list[0]])
+                    count = func["args"][0]
+                    length = len(history)
+                    logging.info("Replica history will be truncated by %s entries." +
+                         "{ CurrentLength: %s TruncateCount: %s }", str(count),
+                         len(history), str(count), extra=logger.NODE_INFO)
+                    if length > int(count) :
+                        history = history[:length-int(count)]
+                    else:
+                        history = []
+                    logging.info("Replica new history. { New Length: %s  }",
+                                 len(history), extra=logger.NODE_INFO)
+                    return True
+        return False
+
+
     def is_extra_op_injected_wedge(trigger_type, arg_list ):
         if "wedge_request" in trigger_type:
             if arg_list[0] in wedge_request_trigger:
@@ -1830,6 +1917,19 @@ class replica(process):
                 if completed_checkpoint_trigger[arg_list[1]].startswith("extra_op"):
                     return True
         return False
+
+    def is_crash_injected_completed_checkpoint(trigger_type, arg_list ):
+        if "checkpoint" in trigger_type or "completed_checkpoint" in trigger_type:
+            if arg_list[0] in checkpoint_trigger:
+                if checkpoint_trigger[arg_list[0]].startswith("crash"):
+                    set_crash()
+                    return True
+            if arg_list[1] in completed_checkpoint_trigger:
+                if completed_checkpoint_trigger[arg_list[1]].startswith("crash"):
+                    set_crash()
+                    return True
+        return False
+
 
     def is_sleep_injected_completed_checkpoint(trigger_type, arg_list ):
         if "checkpoint" in trigger_type or "completed_checkpoint" in trigger_type:
