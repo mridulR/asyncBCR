@@ -31,7 +31,7 @@ class replica(process):
         # client last opearation mapping
         self.client_last_op = {}
 
-        # state of replica - ACTIVE and IMMUTABLE
+        # state of replica - ACTIVE, CRASH and IMMUTABLE
         self.state = "ACTIVE"
 
         # configuration of replica
@@ -155,6 +155,9 @@ class replica(process):
             logging.info("Replica timeout value: %s ms",
                          str(non_head_time_out), extra=logger.NODE_INFO)
         return
+
+    def set_crash():
+        state = "CRASH"
 
     def init_triggers_counters():
 
@@ -456,6 +459,9 @@ class replica(process):
         """ Receives the retransmission acknowledgement from the HEAD to cancel
             the timeout of itself. """
 
+        if state == "CRASH":
+            return
+
         if prev != None:
             print("Received ack from head for retransmission, ",
                   "Cancelling timeout")
@@ -471,7 +477,7 @@ class replica(process):
             the acknowledgement is not received then then trigger
             reconfiguration to olympus. """
 
-        if state == "IMMUTABLE":
+        if state == "CRASH":
             return
 
         if self.prev == None:
@@ -574,6 +580,9 @@ class replica(process):
 
             if is_sleep_injected(triggers, keys):
                 print("Sleep injected")
+
+            if is_crash_injected(triggers, keys):
+                print("Crash injected")
 
             if is_drop_injected(triggers, keys ):
                 injected_drop = True
@@ -697,6 +706,9 @@ class replica(process):
                 if is_sleep_injected_checkpoint(triggers, keys):
                     print("Sleep injected")
 
+                if is_crash_injected_checkpoint(triggers, keys):
+                    print("Crash injected")
+
                 if is_drop_injected_checkpoint(triggers, keys ):
                     injected_drop = True
 
@@ -775,6 +787,10 @@ class replica(process):
         return True
 
     def receive(msg=('chk_point_rslt', chk_point_proof, chk_point_index,), from_=self.next_r):
+
+        if state == "CRASH":
+            return
+
         rslt_chk_pt = get_Min_Check_Pt_Map(chk_point_proof)
         rslt_history = get_result_history(rslt_chk_pt, history)
 
@@ -802,6 +818,9 @@ class replica(process):
 
             if is_sleep_injected_rslt_completed_checkpoint(triggers, keys):
                 print("Sleep injected")
+
+            if is_crash_injected_rslt_completed_checkpoint(triggers, keys):
+                print("Crash injected")
 
             if is_drop_injected_rslt_completed_checkpoint(triggers, keys ):
                 injected_drop = True
@@ -832,6 +851,11 @@ class replica(process):
 
 
     def receive(msg=('chk_point_frwd', chk_point_proof, chk_point_index,), from_=self.prev):
+
+        if state == "CRASH":
+            return
+
+
         if checkpoint_ind + 1 == chk_point_index:
             if is_valid_chk_pt_proof(chk_point_proof, replica_no):
 
@@ -857,6 +881,9 @@ class replica(process):
 
                         if is_sleep_injected_checkpoint(triggers, keys):
                             print("Sleep injected")
+
+                        if is_crash_injected_rslt_completed_checkpoint(triggers, keys):
+                            print("Crash injected")
 
                         if is_drop_injected_checkpoint(triggers, keys ):
                             injected_drop = True
@@ -893,6 +920,9 @@ class replica(process):
 
                         if is_sleep_injected_completed_checkpoint(triggers, keys):
                             print("Sleep injected")
+
+                        if is_crash_injected_rslt_completed_checkpoint(triggers, keys):
+                            print("Crash injected")
 
                         if is_drop_injected_completed_checkpoint(triggers, keys ):
                             injected_drop = True
@@ -967,6 +997,9 @@ class replica(process):
             if is_sleep_injected_new_configuration():
                 print("Sleep injected")
 
+            if is_crash_injected_rslt_completed_checkpoint():
+                print("Crash injected")
+
             if is_drop_injected_new_configuration():
                 injected_drop = True
 
@@ -1000,6 +1033,10 @@ class replica(process):
         return running_state
 
     def receive(msg=('catch_up', long_hist), from_=olympus):
+
+        if state == "CRASH":
+            return
+
         print("sending caught up to olympus")
         slot_order_map = build_slot_order_map(history)
         catched_running_state = catch_longest_hist(slot_order_map, long_hist)
@@ -1024,6 +1061,9 @@ class replica(process):
             if is_sleep_injected_catch_up(triggers, keys):
                 print("Sleep injected")
 
+            if is_crash_injected_rslt_completed_checkpoint(triggers, keys):
+                print("Sleep injected")
+
             if is_drop_injected_catch_up(triggers, keys ):
                 injected_drop = True
 
@@ -1039,6 +1079,7 @@ class replica(process):
         return 
 
     def receive(msg=('get_running_state',), from_=olympus):
+
         print("Sending state to olympus")
         send(('rcv_running_state',replica_no, running_state), to=olympus)
 
@@ -1049,6 +1090,10 @@ class replica(process):
         return 
 
     def receive(msg=('wedge',), from_=olympus):
+
+        if state == "CRASH":
+            return
+
         print("wedge statement received from olympus")
         self.state = "IMMUTABLE"
 
@@ -1067,6 +1112,9 @@ class replica(process):
 
             if is_sleep_injected_wedge(triggers, keys):
                 print("Sleep injected")
+
+            if is_crash_injected_rslt_completed_checkpoint(triggers, keys):
+                print("Crash injected")
 
             if is_drop_injected_wedge(triggers, keys ):
                 injected_drop = True
@@ -1176,6 +1224,18 @@ class replica(process):
                     return True
         return False
 
+    def is_crash_injected(trigger_type, arg_list ):
+         if "shuttle" in trigger_type or "client_request" in trigger_type:
+             if arg_list[1] in client_direct_msg_trigger:
+                    if client_direct_msg_trigger[arg_list[1]].startswith("crash"):
+                         set_crash()
+                         return True
+             if  arg_list[0] in client_shuttle_trigger:
+                 if client_shuttle_trigger[arg_list[0]].startswith("crash"):
+                     set_crash()
+                     return True
+             return False
+
     def is_drop_injected(trigger_type, arg_list ):
         if "shuttle" in trigger_type or "client_request" in trigger_type:
             if arg_list[1] in client_direct_msg_trigger:
@@ -1271,6 +1331,15 @@ class replica(process):
                 if client_shuttle_trigger[arg_list[0]].startswith("drop_result_stmt"):
                     return True
         return False
+
+    def is_crash_injected_forward_shuttle(trigger_type, arg_list ):
+        if "shuttle" in trigger_type:
+            if  arg_list[0] in client_shuttle_trigger:
+                if client_shuttle_trigger[arg_list[0]].startswith("crash"):
+                    set_crash()
+                    return True
+        return False
+
 
     def is_sleep_injected_forward_shuttle(trigger_type, arg_list ):
         if "shuttle" in trigger_type:
@@ -1390,6 +1459,19 @@ class replica(process):
                     return True
         return False
 
+    def is_crash_injected_fs_tail(trigger_type, arg_list ):
+        if "shuttle" in trigger_type or "result_shuttle" in trigger_type:
+            if arg_list[1] in client_result_shuttle_trigger:
+                if client_result_shuttle_trigger[arg_list[1]].startswith("crash"):
+                    set_crash()
+                    return True
+            if  arg_list[0] in client_shuttle_trigger:
+                if client_shuttle_trigger[arg_list[0]].startswith("crash"):
+                    set_crash()
+                    return True
+        return False
+
+
     def is_drop_injected_fs_tail(trigger_type, arg_list ):
         if "shuttle" in trigger_type or "result_shuttle" in trigger_type:
             if arg_list[1] in client_result_shuttle_trigger:
@@ -1470,6 +1552,15 @@ class replica(process):
                     return True
         return False
 
+    def is_crash_injected_rs_tail(trigger_type, arg_list ):
+        if "result_shuttle" in trigger_type:
+            if arg_list[0] in client_result_shuttle_trigger:
+                if client_result_shuttle_trigger[arg_list[0]].startswith("crash"):
+                    set_crash()
+                    return True
+        return False
+
+
     def is_sleep_injected_rs_tail(trigger_type, arg_list ):
         if "result_shuttle" in trigger_type:
             if arg_list[0] in client_result_shuttle_trigger:
@@ -1514,6 +1605,15 @@ class replica(process):
                 if wedge_request_trigger[arg_list[0]].startswith("extra_op"):
                     return True
         return False
+
+    def is_crash_injected_wedge(trigger_type, arg_list ):
+        if "wedge_request" in trigger_type:
+            if arg_list[0] in wedge_request_trigger:
+                if wedge_request_trigger[arg_list[0]].startswith("crash"):
+                    set_crash()
+                    return True
+        return False
+
 
     def is_sleep_injected_wedge(trigger_type, arg_list ):
         if "wedge_request" in trigger_type:
@@ -1560,6 +1660,15 @@ class replica(process):
                     return True
         return False
 
+    def is_crash_injected_catch_up(trigger_type, arg_list ):
+        if "caught_up" in trigger_type:
+            if arg_list[0] in catch_up_trigger:
+                if catch_up_trigger[arg_list[0]].startswith("crash"):
+                    set_crash()
+                    return True
+        return False
+
+
     def is_sleep_injected_catch_up(trigger_type, arg_list ):
         if "caught_up" in trigger_type:
             if arg_list[0] in catch_up_trigger:
@@ -1605,15 +1714,24 @@ class replica(process):
                     return True
         return False
 
+    def is_crash_injected_checkpoint(trigger_type, arg_list ):
+        if "checkpoint" in trigger_type:
+            if arg_list[0] in checkpoint_trigger:
+                if checkpoint_trigger[arg_list[0]].startswith("crash"):
+                    set_crash()
+                    return True
+        return False
+
+
     def is_sleep_injected_checkpoint(trigger_type, arg_list ):
         if "checkpoint" in trigger_type:
             if arg_list[0] in checkpoint_trigger:
                 if checkpoint_trigger[arg_list[0]].startswith("sleep"):
                     func = generic_operation_parser(checkpoint_trigger[arg_list[0]])
                     interval = func["args"][0]
-                    logging.info("Replica sleep will be triggered.", extra=logger.NODE_INFO)
+                    logging.info("replica sleep will be triggered.", extra=logger.node_info)
                     time.sleep(int(interval))
-                    logging.info("Replica sleep completed.", extra=logger.NODE_INFO)
+                    logging.info("replica sleep completed.", extra=logger.node_info)
                     return True
         return False
 
@@ -1648,6 +1766,14 @@ class replica(process):
             if new_configuration_trigger[configuration_num].startswith("extra_op"):
                 return True
         return False
+
+    def is_crash_injected_new_configuration():
+        if configuration_num in new_configuration_trigger:
+            if new_configuration_trigger[configuration_num].startswith("crash"):
+                set_crash()
+                return True
+        return False
+
 
     def is_sleep_injected_new_configuration():
         if configuration_num in new_configuration_trigger:
@@ -1786,6 +1912,15 @@ class replica(process):
                     return True
         return False
 
+    def is_crash_injected_rslt_completed_checkpoint(trigger_type, arg_list ):
+        if "completed_checkpoint" in trigger_type:
+            if arg_list[0] in completed_checkpoint_trigger:
+                if completed_checkpoint_trigger[arg_list[0]].startswith("crash"):
+                    set_crash()
+                    return True
+        return False
+
+
     def is_sleep_injected_rslt_completed_checkpoint(trigger_type, arg_list ):
         if "completed_checkpoint" in trigger_type:
             if arg_list[0] in completed_checkpoint_trigger:
@@ -1827,6 +1962,9 @@ class replica(process):
     # Only head is supposed to handle order request from client
     def receive(msg=('request_order', client, client_no, unique_order_ide,
                      order_req,)):
+
+        if state == "CRASH":
+            return
 
         if self.prev == None:
             #send(('req_reconfiguration', replica_no), to=olympus)
@@ -1881,6 +2019,10 @@ class replica(process):
     # Forward Shuttle to next
     def receive(msg=('forward_shuttle', client, client_no, unique_order_ide,
                      order_proofs, result_proofs, ), from_=self.prev):
+
+        if state == "CRASH":
+            return
+
         logging.info("Received FORWARD_SHUTTLE from previous replica in " +
                      "chain. { OrderNo: %s, OrderRequest: %s ClientNo: %s " +
                      " PreviousReplicaName: %s", unique_order_ide,
@@ -1928,6 +2070,9 @@ class replica(process):
 
                 if is_sleep_injected_forward_shuttle(triggers, keys):
                     print("Sleep injected")
+
+                if is_crash_injected_forward_shuttle(triggers, keys):
+                    print("Crash injected")
 
                 if is_drop_injected_forward_shuttle(triggers, keys ):
                     injected_drop = True
@@ -2029,6 +2174,9 @@ class replica(process):
                 if is_sleep_injected_fs_tail(triggers, keys):
                     print("Sleep injected")
 
+                if is_crash_injected_fs_tail(triggers, keys):
+                    print("Crash injected")
+
                 if is_drop_injected_fs_tail(triggers, keys ):
                     injected_drop = True
 
@@ -2115,6 +2263,9 @@ class replica(process):
     def receive(msg=('result_shuttle', unique_order_ide, client_no,
                      result_proof_pair,), from_=self.next_r):
 
+        if state == "CRASH":
+            return
+
         if self.next_r != None:
             logging.info("Received REVERSE_SHUTTLE from next replica in " +
                          "chain. { OrderNo: %s, ClientNo: %s Result: %s}",
@@ -2159,6 +2310,9 @@ class replica(process):
 
             if is_sleep_injected_rs_tail(triggers, keys):
                 print("Sleep injected")
+
+            if is_crash_injected_rs_tail(triggers, keys):
+                print("Crash injected")
 
             if is_drop_injected_rs_tail(triggers, keys ):
                 injected_drop = True
@@ -2236,6 +2390,9 @@ class replica(process):
 
     # Re-transmission from client
     def receive(msg=('retransmission', client, client_no, order_id, order,)):
+
+        if state == "CRASH":
+            return
 
         logging.info("Received retransmission request from Client. {OrderNo:" +
                      "%s, Order: %s, ClientNo: %s, ClientId: %s}",
