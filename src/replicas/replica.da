@@ -78,6 +78,7 @@ class replica(process):
 
         # current_slot updated only by head replica
         self.current_slot = 0
+        self.last_slot_seen = 0
 
         # running state of replica
         self.running_state = {}
@@ -171,28 +172,7 @@ class replica(process):
         # Non-Head Timeout Counter
         self.non_head_time_out_counter = {}
 
-        # Triggers
-        self.client_direct_msg_trigger = {}
-        self.client_fwd_rqst_trigger = {}
-        self.client_shuttle_trigger = {}
-        self.client_result_shuttle_trigger = {}
-        self.checkpoint_trigger = {}
-        self.completed_checkpoint_trigger = {}
-        self.wedge_request_trigger = {}
-        self.new_configuration_trigger = {}
-        self.get_running_state_trigger = {}
-        self.catch_up_trigger = {}
-
-        # Trigger Counter
-        self.client_direct_msg_counter = {}
-        self.client_fwd_rqst_counter = {}
-        self.client_shuttle_counter = {}
-        self.client_result_shuttle_counter = {}
-        self.checkpoint_counter = 0
-        self.completed_checkpoint_counter = 0
-        self.wedge_request_counter = 0
-        self.get_running_state_counter = 0
-        self.catch_up_counter = 0
+        return
 
     def generic_operation_parser(operation):
         func = {}
@@ -222,6 +202,33 @@ class replica(process):
         function_list.append(trigger[index+2:])
         return function_list
 
+    def dump_failure_triggers():
+
+        logging.info("ConfigNum: %s", str(configuration_num), extra=logger.NODE_INFO)
+
+        logging.info("CR: %s", client_direct_msg_trigger, extra=logger.NODE_INFO)
+        logging.info("FR: %s", client_fwd_rqst_trigger, extra=logger.NODE_INFO)
+        logging.info("SR: %s", client_shuttle_trigger, extra=logger.NODE_INFO)
+        logging.info("RS: %s", client_result_shuttle_trigger, extra=logger.NODE_INFO)
+        logging.info("CP: %s", checkpoint_trigger, extra=logger.NODE_INFO)
+        logging.info("CC: %s", completed_checkpoint_trigger, extra=logger.NODE_INFO)
+        logging.info("WR: %s", wedge_request_trigger, extra=logger.NODE_INFO)
+        logging.info("NC: %s", new_configuration_trigger, extra=logger.NODE_INFO)
+        logging.info("GR: %s", get_running_state_trigger, extra=logger.NODE_INFO)
+        logging.info("CU: %s", catch_up_trigger, extra=logger.NODE_INFO)
+        
+        logging.info("CRC: %s", client_direct_msg_counter, extra=logger.NODE_INFO)
+        logging.info("FRC: %s", client_fwd_rqst_counter, extra=logger.NODE_INFO)
+        logging.info("SRC: %s", client_shuttle_counter, extra=logger.NODE_INFO)
+        logging.info("RSC: %s", client_result_shuttle_counter, extra=logger.NODE_INFO)
+        logging.info("CPC: %s", checkpoint_counter, extra=logger.NODE_INFO)
+        logging.info("CCC: %s", completed_checkpoint_counter, extra=logger.NODE_INFO)
+        logging.info("WRC: %s", wedge_request_counter, extra=logger.NODE_INFO)
+        logging.info("GRC: %s", get_running_state_counter, extra=logger.NODE_INFO)
+        logging.info("CUC: %s", catch_up_counter, extra=logger.NODE_INFO)
+
+        return
+
     def set_failure_triggers():
         """ Setting up the injection point for each replica after reading the
             configuration from the config file.based on configuration. """
@@ -232,16 +239,20 @@ class replica(process):
                 config_replica = re.search(r'\[(.*?),(.*?)\]', key)
                 config_num = int(config_replica.group(1))
                 replica = int(config_replica.group(2))
-
+                print(" HELLO1 - ", key, value)
                 if config_num == configuration_num and replica == replica_no:
                     trigger_failures = [each.strip() for each in value.split(';')]
+                    print(" HELLO2 - ", trigger_failures)
                     for trigg_fail in trigger_failures:
+                        print(" HELLO3 - ",trigg_fail)
                         if trigg_fail.startswith("client_request"):
+                            print(" HELLO6 - ", client_direct_msg_trigger)
                             trigger = trigger_parser(trigg_fail)
                             trig = generic_operation_parser(trigger[0])
                             key = trig["args"][0] + "_" + trig["args"][1]
                             operation = trigger[1]
                             client_direct_msg_trigger[key] = operation
+                            print(" HELLO7 - ", client_direct_msg_trigger)
                         elif trigg_fail.startswith("forwarded_request"):
                             trigger = trigger_parser(trigg_fail)
                             trig = generic_operation_parser(trigger[0])
@@ -249,11 +260,13 @@ class replica(process):
                             operation = trigger[1]
                             client_fwd_rqst_trigger[key] = operation
                         elif trigg_fail.startswith("shuttle"):
+                            print(" HELLO4 - ", client_shuttle_trigger)
                             trigger = trigger_parser(trigg_fail)
                             trig = generic_operation_parser(trigger[0])
                             key = trig["args"][0] + "_" + trig["args"][1]
                             operation = trigger[1]
                             client_shuttle_trigger[key] = operation
+                            print(" HELLO5 - ", client_shuttle_trigger)
                         elif trigg_fail.startswith("result_shuttle"):
                             trigger = trigger_parser(trigg_fail)
                             trig = generic_operation_parser(trigger[0])
@@ -878,7 +891,7 @@ class replica(process):
                 del chk_point_proof[key]
 
         print("checkpont Completed ***********************")
-        print(checkpoint_ind, " - ", client_last_op)
+        print("chk point ind - ", checkpoint_ind, " - currconfig - ", configuration_num )
         print(checkpoint)
         print("History : ")
         for his in history:
@@ -1011,7 +1024,7 @@ class replica(process):
                     send(('req_reconfiguration', replica_no), to=olympus)
 
     def receive(msg=('new_configuration', config_ind, run_state), from_=olympus):
-        print("Received new configuration ======, " )
+        print("Received new configuration ======, ", config_ind )
         self.configuration_num = config_ind
         self.history = []
         #self.opr_count_chk_pt = 0
@@ -1035,6 +1048,7 @@ class replica(process):
 
         init_triggers_counters()
         set_failure_triggers()
+        dump_failure_triggers()
         print("Resetting triggers")
         
 
@@ -1071,9 +1085,10 @@ class replica(process):
             self.cache = {} 
 
         logging.info("Sending new_config_done to Olympus !!! ", extra=logger.NODE_INFO)
-        send(('new_config_done', replica_no), to=olympus)
+        print("sending new config code")
+        self.state = "ACTIVE"
         self.cache = {}
-
+        send(('new_config_done', replica_no), to=olympus)
         return 
 
     def build_slot_order_map(history):
@@ -1386,10 +1401,16 @@ class replica(process):
         return False
 
     def is_order_injected_forward_shuttle(trigger_type, arg_list ):
+        print("Roku 123456789")
+        print(client_shuttle_trigger)
+        print(client_shuttle_counter)
+        print(trigger_type, arg_list)
         if "shuttle" in trigger_type:
             if  arg_list[0] in client_shuttle_trigger:
                 if client_shuttle_trigger[arg_list[0]].startswith("change_operation"):
+                    print("Roku 2")
                     return True
+        print("Roku 3")
         return False
 
     def is_result_injected_forward_shuttle(trigger_type, arg_list ):
@@ -2153,7 +2174,7 @@ class replica(process):
                          extra=logger.NODE_INFO)
 
             self.opr_count_chk_pt = self.opr_count_chk_pt + 1
-            if self.opr_count_chk_pt % 10 == 0:
+            if self.opr_count_chk_pt % 3 == 0:
                 self.checkpoint_counter = self.checkpoint_counter + 1
                 #print("checkpointing counter - ", opr_count_chk_pt)
                 start_check_pointing()
@@ -2211,11 +2232,13 @@ class replica(process):
             # Injected code ---- Start
             if client_no not in client_shuttle_counter:
                 client_shuttle_counter[client_no] = 0
+            print("PrevSC: ", client_shuttle_counter)
             client_shuttle_counter[client_no] += 1
             shuttle_key = str(client_no) + "_" + str(client_shuttle_counter[client_no])
             triggers = ["shuttle"]
             keys = [shuttle_key]
-
+            print("PrevSC: ", client_shuttle_counter)
+            
             invalid_order_sign = False
             invalid_result_sign = None 
             injected_result = None
@@ -2259,14 +2282,19 @@ class replica(process):
             if is_valid_order_proofs(order_proofs):
                 rcv_current_slot, order_req = get_slot_order(order_proofs)
 
-                '''if rcv_current_slot - current_slot > 1:
+                if rcv_current_slot - last_slot_seen == 2:
                     print("Slot se cher char hua hai !!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                    send(('req_reconfiguration', replica_no), to=olympus)'''
+                    send(('req_reconfiguration', replica_no), to=olympus)
+                last_slot_seen = rcv_current_slot
+
+                print("out of check **************************************************")
 
                 client_last_op[client_no] = order_req
 
                 order_inj = order_req
+                print("Roku 5")
                 if is_order_injected_forward_shuttle(triggers, keys):
+                    print("Roku 6")
                     order_inj = "get('X')"
 
                 predecessor_order_proof = order_proofs[replica_no - 1][3]
@@ -2418,7 +2446,7 @@ class replica(process):
                              extra=logger.NODE_INFO)
                 print ("sending back result proof - ", unique_order_ide)
                 print("checkpont Completed ***********************")
-                print(checkpoint_ind, " -  ", client_last_op)
+                print("chk point ind - ", checkpoint_ind, " - currconfig - ", configuration_num )
                 print(checkpoint)
                 print("History : ")
                 for his in history:
@@ -2571,7 +2599,7 @@ class replica(process):
                         send(('req_reconfiguration', replica_no), to=olympus)
 
             print("checkpont Completed ***********************")
-            print(checkpoint_ind, " - ", client_last_op)
+            print("chk point ind - ", checkpoint_ind, " - currconfig - ", configuration_num )
             print(checkpoint)
             print("History : ")
             for his in history:

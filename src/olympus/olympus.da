@@ -45,58 +45,45 @@ class olympus(process):
         self.quorum_size = ((len(replica_list) - 1) / 2) + 1
 
         self.is_reconfig_in_progress = False
-        self.replica_info = {}
+        self.replica_wedge_info = {}
         self.config = 0
         self.consistent_caught_up = {}
         self.reconfig_running_state = None
         self.reconfig_hash_value = None
+        self.new_config_applied = {}
+        self.all_running_states = {}
         return
 
-    def is_checkpoint_consistent(replica_info):
-        if len(replica_info) < 2:
-            return False
-        chk_pt_ind = -1
-        chk_pt = ""
-        for key in replica_info.keys():
-            value = replica_info[key]
-            if chk_pt_ind == -1 and len(chk_pt) == 0:
-                chk_pt_ind = value[0]
-                chk_pt = value[1]
-                continue
-            if chk_pt_ind != value[0]:
-                return False
-            else:
-                if len(chk_pt) != len(value[1]):
-                    return False
-                for sec in chk_pt.keys():
-                    val1 = chk_pt[sec]
-                    if sec not in value[1].keys():
-                        return False
-                    val2 = value[1][sec]
-                    if val1 != val2:
-                        return False
-        return True
-
-    def get_slot_order_uninon(slot_order_map_1, slot_order_map_2):
+    def get_slot_order_union(slot_order_map_1, slot_order_map_2):
+        if slot_order_map_1 == None or slot_order_map_2 == None:
+            return None
         result = {}
         for key in slot_order_map_1.keys():
-            result[key] = slot_order_map_1[key]
-        
+            if key in slot_order_map_2.keys():
+                val_1 = slot_order_map_1[key]
+                val_2 = slot_order_map_2[key]
+                if val_1 == val_2:
+                    result[key] = slot_order_map_1[key]
+                else:
+                    return None
+            else:    
+                result[key] = slot_order_map_1[key]
+
         for key in slot_order_map_2.keys():
-            result[key] = slot_order_map_2[key]
+            if key not in result.keys():
+                result[key] = slot_order_map_2[key]
         return result
 
     def build_longest_history(chk_point_proof):
         if chk_point_proof == None:
-            return None
+            return None 
         if len(chk_point_proof) < 2:
             return chk_point_proof
-
         result = {}
-
-        result = chk_point_proof[0]
-        for ind in range(1, len(replicas)):
+        for ind in chk_point_proof.keys():
             result = get_slot_order_union(result, chk_point_proof[ind])
+            if result == None:
+                return None
         return result
 
 
@@ -106,56 +93,104 @@ class olympus(process):
             return False
         return True
 
-
     def has_consistent_history_chk_pt(replica_info):
-        #if not is_checkpoint_consistent(replica_info):
-        #    return False
         if not is_history_consistent(replica_info):
             return False
         return True
 
+
+    def build_consistent_history(replica_wedge_info):
+        print("Wedge_resp: build_consistent_history")
+        if has_consistent_history_chk_pt(replica_wedge_info):
+            print("Wedge_resp: Has consistent Hsitory")
+            long_hist = build_longest_history(replica_wedge_info)
+            print("Wedge_resp: Longest Hist", long_hist)
+            do_caught_up_consistent(replica_wedge_info, long_hist)
+        else:
+            replica_wedge_info = {}
+            new_config_applied = {}
+            print("Wedge_resp: Reset replica_wedge_info, new_config_applied")
+            is_reconfig_in_progress = False
+            print( " SEND WEDGE : is_reconfig_in_progress = False")
+            for replica in replica_list:
+                send(('wedge',), to=replica)
+        return
+
     def receive(msg=('wedge_resp', replica_no, hist)):
-        print("Reconfiguration  response received from ", replica_no)
-        if len(replica_info) == 0:
+        print("Wedge_Resp: Reconfiguration response received from ", replica_no)
+        if is_reconfig_in_progress == False:
+            print("Wedge_Resp: Ignored as no reconfig going on")
+            return
+        if len(replica_wedge_info) > quorum_size:        
+            print("Wedge_Resp: Quorum already met for wedge_resp", replica_no)
+            return
+        replica_wedge_info[replica_no] = hist
+        if len(replica_wedge_info) == quorum_size:
+            print("Wedge_Resp: quorum replica - ", replica_wedge_info.keys())
+            build_consistent_history(replica_wedge_info)
+        return
+
+    def receive(msg=('caught_up', replica_no, hash_value)):
+        print("Caught_up: Reconfiguration response received from ", replica_no)
+        if is_reconfig_in_progress == False:
+            print("Caught_up: Ignored as no reconfig going on")
+            return
+        if len(consistent_caught_up) > quorum_size:
+            print("Caught_up: Quorum already met for wedge_resp", replica_no)
+            return
+        consistent_caught_up[replica_no] = hash_value
+        print("Caught_up: consistent_caught_up", consistent_caught_up[replica_no])
+        if len(consistent_caught_up) == quorum_size:
+            hash_value = ""
+            for key in consistent_caught_up.keys():
+                if len(hash_value) == 0:
+                    hash_value = consistent_caught_up[key]
+                elif hash_value == consistent_caught_up[key]:
+                    reconfig_hash_value = hash_value
+            get_running_state(consistent_caught_up)
+        else:
+            print("Will do something")
+        return
+
+    def get_running_state(consistent_caught_up):
+        print("Invoke get_running_state: Ignored as no reconfig going on")
+        for key in consistent_caught_up.keys():
+            send(('get_running_state',), to=replica_list[key])
+        return
+
+
+    def receive(msg=('rcv_running_state', replica_no, running_state)):
+        print("Running_state: { replica: %s running_state: %s }", str(replica_no), running_state)
+        if is_reconfig_in_progress == False:
+            print("Running_state: Configuration in progress ")
+            return
+        if len(consistent_caught_up) > quorum_size:
+            print("Running_state: Reached Quorum")
+            return
+        all_running_states[replica_no] = running_state
+        print("Running_state: ", all_running_states)
+        if len(all_running_states) == quorum_size:
+            print("Running_state: ", len(all_running_states), quorum_size)
+            consistent_run_state = None
+            for key in all_running_states:
+                print("Running_state: Key: ", key)
+                run_state = all_running_states[key]
+                if verify_running_state(run_state):
+                    print("Running_state: verify_running_state: True", run_state)
+                    consistent_run_state = run_state
+                    break
+            print("Running_state: Before: config, replica_wedge_info, new_config_applied, T/F, con.")
+            print(config, replica_wedge_info, new_config_applied, is_reconfig_in_progress, consistent_caught_up)
             config += 1
-
-        replica_info[replica_no] = hist
-
-        if len(replica_info) == quorum_size:
-            print("quorum replica - ", replica_info.keys())
-            if has_consistent_history_chk_pt(replica_info) == False:
-                is_reconfig_in_progress = False
-                for replica in replica_list:
-                    send(('wedge',), to=replica)
-                await(len(setof(a, received(('wedge_resp', _,_), from_=a))) >= quorum_size)
-            else:
-                long_hist = build_longest_history(replica_info)
-                if is_caught_up_consistent(replica_info, long_hist) and get_running_state() != None:
-                    #new_chk_point = chk_pt
-                    #new_chk_point.update(long_hist)
-                    running_state = get_running_state()
-                    config += 1
-                    for replica in replica_list:
-                        send(('new_configuration', config,  running_state,), to=replica)
-                    print("Awaiting new configuration accepted")    
-                    length = ( 2 * quorum_size ) + 1
-                    replica_info = {}
-                    if await(len(setof(a, received(('new_config_done',_,), from_=a))) == length):
-                        replica_info = {}
-                        #is_reconfig_in_progress = False
-                    elif timeout(OLYMPUS_TIME_OUT_SEC):
-                        is_reconfig_in_progress = False
-                        for replica in replica_list:
-                            send(('wedge',), to=replica)
-                        await(len(setof(a, received(('wedge_resp', _,_), from_=a))) >= quorum_size)
-
-                else:
-                    is_reconfig_in_progress = False
-                    for replica in replica_list:
-                        send(('wedge',), to=replica)
-                    await(len(setof(a, received(('wedge_resp', _, __), from_=a))) >= quorum_size)
-
-        #is_reconfig_in_progress = False
+            replica_wedge_info = {}
+            new_config_applied = {}
+            consistent_caught_up = {}
+            is_reconfig_in_progress = False
+            print("Running_state: After: config, replica_wedge_info, new_config_applied, T/F, con.")
+            print(config, replica_wedge_info, new_config_applied, is_reconfig_in_progress, consistent_caught_up)
+            print("Running State: Sending new configuration ................, ", replica_list)
+            for replica in replica_list:
+                send(('new_configuration', config,  consistent_run_state,), to=replica)
         return
 
     def verify_running_state(running_state):
@@ -167,17 +202,16 @@ class olympus(process):
         else:
             return False
 
-    def receive(msg=('rcv_running_state', replica_no, running_state)):
-        if verify_running_state(running_state):
-            print("Valid running state for ", replica_no)
-        else:
-            print("Invalid running state for ", replica_no)
-
-    def get_running_state():
-        for key in consistent_caught_up.keys():
-            send(('get_running_state',), to=replica_list[key])
-        await(len(setof(a, received(('rcv_running_state',_,_,), from_=a))) == quorum_size)
-        return reconfig_running_state
+    def do_caught_up_consistent(replica_info, long_hist):
+        consistent_caught_up = {}
+        reconfig_running_state = None
+        reconfig_hash_value = None
+        for ind in replica_info.keys():
+            replica = replica_list[ind]
+            print("Asking catch up from - ", ind)
+            send(('catch_up', long_hist), to=replica)
+        print("Awaitaing for caught up response from ", replica_info.keys())
+        return
 
     def is_caught_up_consistent(replica_info, long_hist):
         consistent_caught_up = {}
@@ -185,60 +219,57 @@ class olympus(process):
         reconfig_hash_value = None
         for ind in replica_info.keys():
             replica = replica_list[ind]
+            print("Asking catch up from - ", ind)
             send(('catch_up', long_hist), to=replica)
         print("Awaitaing for caught up response from ", replica_info.keys())
-        if await(len(setof(a, received(('caught_up', _, _), from_=a))) == quorum_size):
-            print("Await ended")
-            hash_value = ""
-            for key in consistent_caught_up.keys():
-                if len(hash_value) == 0:
-                    hash_value = consistent_caught_up[key]
-                elif hash_value != consistent_caught_up[key]:
-                    return False
-            reconfig_hash_value = hash_value
-            return True
-        elif timeout(OLYMPUS_TIME_OUT_SEC):
-            return False 
+        await(len(setof(a, received(('caught_up', _, _), from_=a))) >= quorum_size)
+        print("Await ended")
+        hash_value = ""
+        for key in consistent_caught_up.keys():
+            if key not in replica_wedge_info.keys():
+                continue
+            if len(hash_value) == 0:
+                hash_value = consistent_caught_up[key]
+            elif hash_value != consistent_caught_up[key]:
+                return False
+        reconfig_hash_value = hash_value
+        return True
 
 
     def receive(msg=('new_config_done', client_no)):
         print("New config done for ", client_no)
 
-    def receive(msg=('caught_up', client_no, hash_value)):
-        consistent_caught_up[client_no] = hash_value
-        print("Received caught up from ", client_no, " is - ", hash_value)
 
     def receive(msg=('req_reconfiguration', replica_no)):
+        print("REQ_RECONFIG: from replica", replica_no)
         if is_reconfig_in_progress == True:
+            print("REQ_RECONFIG: Reconfiguration was in progress", replica_no)
             return
         is_reconfig_in_progress = True
-        print("Reconfiguration  request received from ", replica_no)
+        print("REQ_RECONFIG: is_reconfig_in_progress: True, Replica: ", replica_no)
         for replica in replica_list:
             send(('wedge',), to=replica)
-
-        await(len(setof(a, received(('wedge_resp', _,_), from_=a))) >= quorum_size)
-        for replica in replica_list:
-            send(('activate',), to=replica)
-        print("Awaiting activation ack")
-        await(len(setof(a, received(('ack_activate', _), from_=a))) == len(replica_list))
-        is_reconfig_in_progress = False
         return
 
     def receive(msg=('ack_activate', replica_no)):
+        if is_reconfig_in_progress == False:
+            return
         print("Rcv activate acknowledgement from client - ", replica_no)
 
     def receive(msg=('req_curr_config', client)):
         """ Receives the CURRENT_CONFIG request from client. """
 
-        logging.info("Received request CURRENT_CONFIG from %s",
-                     str(client), extra=logger.NODE_INFO)
         if client is not None:
             logging.info("Sending CURRENT_CONFIG to : %s", str(client),
                          extra=logger.NODE_INFO)
             if is_reconfig_in_progress == False:
+                logging.info("Sending Non Emprty CURRENT_CONFIG to : %s", str(client),
+                         extra=logger.NODE_INFO)
                 send(('rcv_curr_config', replica_list, replica_name,
                     replica_verify_keys), to=client)
             else:
+                logging.info("Sending Empty CURRENT_CONFIG to : %s", str(client),
+                         extra=logger.NODE_INFO)
                 send(('rcv_curr_config', [], [], []), to=client)
         else:
             logger.setLogFormatting(self.name + '.log',
